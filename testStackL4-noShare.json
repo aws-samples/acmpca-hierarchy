@@ -1,0 +1,63 @@
+[
+    {
+        "ParameterKey": "pOrganization",
+        "ParameterValue": "MyDomain LLC"
+    },
+    {
+        "ParameterKey": "pOrganizationalUnit",
+        "ParameterValue": "Cloud IT"
+    },
+    {
+        "ParameterKey": "pCountry",
+        "ParameterValue": "US"
+    },
+    {
+        "ParameterKey": "pState",
+        "ParameterValue": "California"
+    },
+    {
+        "ParameterKey": "pLocality",
+        "ParameterValue": "Los Angeles"
+    },
+    {
+        "ParameterKey": "pRootCommonName",
+        "ParameterValue": "noshare-mydomain.io"
+    },
+    {
+        "ParameterKey": "pSub1CommonName",
+        "ParameterValue": "subdomain1.noshare-mydomain.io"
+    },
+    {
+        "ParameterKey": "pSub2CommonName",
+        "ParameterValue": "subdomain2.subdomain1.noshare-mydomain.io"
+    },
+    {
+        "ParameterKey": "pSub3CommonName",
+        "ParameterValue": "subdomain3.subdomain2.subdomain1.noshare-mydomain.io"
+    },
+    {
+        "ParameterKey": "pSub4CommonName",
+        "ParameterValue": "subdomain4.subdomain3.subdomain2.subdomain1.noshare-mydomain.io"
+    },
+    {
+        "ParameterKey": "pLogCRLBucket",
+        "ParameterValue": ""
+    },
+    {
+        "ParameterKey": "pRootCRLBucket",
+        "ParameterValue": ""
+    },
+    {
+        "ParameterKey": "pManagmentAccount",
+        "ParameterValue": "1111222233334444"
+    },
+    {
+        "ParameterKey": "pAWSOrganizationId",
+        "ParameterValue": ""
+    },
+    {
+        "ParameterKey": "pAWSOrganizationalUnit",
+        "ParameterValue": ""
+    }
+]
+

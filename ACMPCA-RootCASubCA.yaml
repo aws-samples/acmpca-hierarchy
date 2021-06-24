@@ -1,0 +1,798 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  This AWS CloudFormation template deploys an AWS ACM Private CA with a multi-level, 
+  subordinate hierarchy in a specified AWS Region and account. It supports conditionally
+  specifying the level of subordination. For example, create a root and one subordinate
+  CA (two CA level hierarchy) by leaving the parameters of subordinates 2-4 blank.
+  Optionally, create S3 buckets for the Certificate Revocation List (CRL) and for CRL
+  access logging and optionally share the end-entity certificate generating subordinate
+  to an AWS organization or organizational unit via AWS Resource Access Manager (AWS RAM).
+
+# See also https://aws.amazon.com/blogs/security/how-to-use-aws-ram-to-share-your-acm-private-ca-cross-account/
+#          https://docs.aws.amazon.com/acm-pca/latest/userguide/ca-hierarchy.html
+#          https://docs.aws.amazon.com/acm-pca/latest/userguide/PcaCreateCa.html
+
+Parameters:
+  # Certificate Subject Info
+  pOrganization:
+    Description: The name of the organization for the certificate subject, e.g. MyDomain LLC. Max length of 64 characters.
+    Type: String
+    MaxLength: 64
+  pOrganizationalUnit:
+    Description: The name of the organizational unit that owns the certificate for the certificate subject, e.g. Cloud IT. Max length of 64 characters.
+    Type: String
+    MaxLength: 64
+  pCountry:
+    Description: The two character country code for the certificate subject, e.g. US.
+    Type: String
+    Default: US
+    MinLength: 2
+    MaxLength: 2
+    AllowedPattern: "[A-Z]*"
+  pState:
+    Description: The state for the certificate subject, e.g. California. Max length of 128 characters.
+    Type: String
+    MaxLength: 128
+  pLocality:
+    Description: The locality for the certificate subject, e.g. Los Angeles. Max length 128 characters.
+    Type: String
+    MaxLength: 128
+  # Certificate Encryption Info
+  pKeyAlgorithm:
+    Description: Type of the public key algorithm and size, in bits, of the key pair that your CA creates when it issues a certificate.
+    Type: String
+    Default: RSA_2048
+    AllowedValues:
+      - RSA_2048
+      - RSA_4096
+      - EC_prime256v1
+      - EC_secp384r1
+  pSigningAlgorithm:
+    Description: Name of the algorithm your private CA uses to sign certificate requests.
+    Type: String
+    Default: SHA256WITHRSA
+    AllowedValues:
+      - SHA256WITHECDSA
+      - SHA256WITHRSA
+      - SHA384WITHECDSA
+      - SHA384WITHRSA
+      - SHA512WITHECDSA
+      - SHA512WITHRSA
+  # Root Certificate Authority Info
+  pRootCommonName:
+    Description: Fully qualified domain name (FQDN) associated with the certificate subject, e.g. mydomain.io. Max length of 64 characters.
+    Type: String
+    MaxLength: 64
+  pRootCACertExpiry:
+    Description: Certificate expiration in days, e.g. 3651.
+    Type: String
+    Default: 3651
+  pRootCRLExpiry:
+    Description: Root CRL expiry in days, must be higher than the subordinate CRL expiry, e.g. 90.
+    Type: String
+    Default: 90
+  # 1st Level Subordinate Certificate Authority Info
+  pSub1CommonName:
+    Description: Fully qualified domain name (FQDN) associated with the certificate subject, e.g. subdomain1.mydomain.io. Leave this blank to skip building this subordinate CA, not best practice to have no subordinates. Max length of 64 characters.
+    Type: String
+    MaxLength: 64
+  pSub1CACertExpiry:
+    Description: Certificate expiration in days, e.g. 1825. Must be smaller than higher level CAs.
+    Type: String
+    Default: 1825
+  pSub1CRLExpiry:
+    Description: 1st Subordinate CRL expiry in days, must be smaller than higher level CAs, e.g. 60.
+    Type: String
+    Default: 60
+  # 2nd Level Subordinate Certificate Authority Info
+  pSub2CommonName:
+    Description: Fully qualified domain name (FQDN) associated with the certificate subject, e.g. subdomain2.subdomain1.mydomain.io. Leave this blank to skip building this subordinate CA. Max length of 64 characters.
+    Type: String
+    MaxLength: 64
+  pSub2CACertExpiry:
+    Description: Certificate expiration in days, e.g. 1095. Must be smaller than higher level CAs.
+    Type: String
+    Default: 1095
+  pSub2CRLExpiry:
+    Description: 2nd Subordinate CRL expiry in days, must be smaller than higher level CAs, e.g. 50.
+    Type: String
+    Default: 50
+  # 3rd Level Subordinate Certificate Authority Info
+  pSub3CommonName:
+    Description: Fully qualified domain name (FQDN) associated with the certificate subject, e.g. subdomain3.subdomain2.subdomain1.mydomain.io. Leave this blank to skip building this subordinate CA. Max length of 64 characters.
+    Type: String
+    MaxLength: 64
+  pSub3CACertExpiry:
+    Description: Certificate expiration in days, e.g. 730. Must be smaller than higher level CAs.
+    Type: String
+    Default: 730
+  pSub3CRLExpiry:
+    Description: 1st Subordinate CRL expiry in days, must be smaller than higher level CAs, e.g. 40.
+    Type: String
+    Default: 40
+  # 4th Level Subordinate Certificate Authority Info
+  pSub4CommonName:
+    Description: Fully qualified domain name (FQDN) associated with the certificate subject, e.g. subdomain4.subdomain3.subdomain2.subdomain1.mydomain.io. Leave this blank to skip building this subordinate CA. Max length of 64 characters.
+    Type: String
+    MaxLength: 64
+  pSub4CACertExpiry:
+    Description: Certificate expiration in days, e.g. 365. Must be smaller than higher level CAs.
+    Type: String
+    Default: 365
+  pSub4CRLExpiry:
+    Description: 1st Subordinate CRL expiry in days, must be smaller than higher level CAs, e.g. 30.
+    Type: String
+    Default: 30
+  # Optional buckets
+  pRootCRLBucket:
+    Description: Name of S3 bucket for the CRL, e.g. mydomain-io-acmpca-crl. Leaving this blank will disable CRL.
+    Type: String
+  pLogCRLBucket:
+    Description: Name of S3 bucket where the log of CRL access is stored, e.g. mydomain-io-acmpca-log. Leaving this blank will disable CRL access logging.
+    Type: String
+  # AWS Organization Account Info
+  pManagmentAccount:
+    Description: Share the lowest level CA to the specified AWS Organizations management account, e.g., 112233445566. Leaving this blank will not create the AWS RAM share.
+    Type: String
+  pAWSOrganizationId:
+    Description: Share the lowest level CA to the specified AWS Organization e.g., o-fortestorg. Required with account ID above for the AWS RAM share. Include an OU below to share at the OU level.
+    Type: String
+    Default: ""
+  pAWSOrganizationalUnit:
+    Description: Share the lowest level CA to the specified AWS Organizational Unit e.g. ou-foratestou. Leave this blank and include an Org ID above to share at the Organization level.
+    Type: String
+    Default: ""
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Certificate Subject Info"
+        Parameters:
+          - pOrganization
+          - pOrganizationalUnit
+          - pCountry
+          - pState
+          - pLocality
+      - Label:
+          default: "Certificate Encryption Info"
+        Parameters:
+          - pKeyAlgorithm
+          - pSigningAlgorithm
+      - Label:
+          default: "Root Certificate Authority Info"
+        Parameters:
+          - pRootCommonName
+          - pRootCACertExpiry
+          - pRootCRLBucket
+          - pRootCRLExpiry
+          - pLogCRLBucket
+      - Label:
+          default: "1st Level Subordinate Certificate Authority Info"
+        Parameters:
+          - pSub1CommonName
+          - pSub1CACertExpiry
+          - pSub1CRLExpiry
+      - Label:
+          default: "2nd Level Subordinate Certificate Authority Info"
+        Parameters:
+          - pSub2CommonName
+          - pSub2CACertExpiry
+          - pSub2CRLExpiry
+      - Label:
+          default: "3rd Level Subordinate Certificate Authority Info"
+        Parameters:
+          - pSub3CommonName
+          - pSub3CACertExpiry
+          - pSub3CRLExpiry
+      - Label:
+          default: "4th Level Subordinate Certificate Authority Info"
+        Parameters:
+          - pSub4CommonName
+          - pSub4CACertExpiry
+          - pSub4CRLExpiry
+      - Label:
+          default: "AWS Organization Account Info"
+        Parameters:
+          - pManagmentAccount
+          - pAWSOrganizationId
+          - pAWSOrganizationalUnit
+    #Define user friendly names for the parameters
+    ParameterLabels:
+      pOrganization:
+        default: Organization
+      pOrganizationalUnit:
+        default: Organizational Unit
+      pCountry:
+        default: Country
+      pState:
+        default: State
+      pLocality:
+        default: Locality
+      pKeyAlgorithm:
+        default: Key Algorithm
+      pSigningAlgorithm:
+        default: SigningAlgorithm
+      pRootCommonName:
+        default: Common Name
+      pRootCACertExpiry:
+        default: Certificate Expiry
+      pRootCRLExpiry:
+        default: CRL Expiry
+      pSub1CommonName:
+        default: Common Name
+      pSub1CACertExpiry:
+        default: Certificate Expiry
+      pSub1CRLExpiry:
+        default: CRL Expiry
+      pSub2CommonName:
+        default: Common Name
+      pSub2CACertExpiry:
+        default: Certificate Expiry
+      pSub2CRLExpiry:
+        default: CRL Expiry
+      pSub3CommonName:
+        default: Common Name
+      pSub3CACertExpiry:
+        default: Certificate Expiry
+      pSub3CRLExpiry:
+        default: CRL Expiry
+      pSub4CommonName:
+        default: Common Name
+      pSub4CACertExpiry:
+        default: Certificate Expiry
+      pSub4CRLExpiry:
+        default: CRL Expiry
+      pRootCRLBucket:
+        default: CRL Bucket Name
+      pLogCRLBucket:
+        default: Log Bucket Name
+      pManagmentAccount:
+        default: AWS Organizations Managment Account
+      pAWSOrganizationId:
+        default: AWS Organization Id
+      pAWSOrganizationUnit:
+        default: AWS Organizational Unit
+
+Conditions:
+  # Do not create subordinates if their certificate subject common names are left blank
+  #   If Sub1 is not built, don't build any others. These subordinates must be built in order
+  EnableCRL: !Not
+    - !Equals
+      - !Ref pRootCRLBucket
+      - ""
+  EnableCRLLog: !And
+    - !Condition EnableCRL
+    - !Not
+      - !Equals
+        - !Ref pLogCRLBucket
+        - ""
+  CreateSub1: !Not
+    - !Equals
+      - !Ref pSub1CommonName
+      - ""
+  CreateSub2: !And
+    - !Condition CreateSub1
+    - !Not
+      - !Equals
+        - !Ref pSub2CommonName
+        - ""
+  CreateSub3: !And
+    - !Condition CreateSub2
+    - !Not
+      - !Equals
+        - !Ref pSub3CommonName
+        - ""
+  CreateSub4: !And
+    - !Condition CreateSub3
+    - !Not
+      - !Equals
+        - !Ref pSub4CommonName
+        - ""
+  CreateOrgShare: !And
+    - !Not
+      - !Equals
+        - !Ref pManagmentAccount
+        - ""
+    - !Not
+      - !Equals
+        - !Ref pAWSOrganizationId
+        - ""
+  CreateOUShare: !And
+    - !Condition CreateOrgShare
+    - !Not
+      - !Equals
+        - !Ref pAWSOrganizationalUnit
+        - ""
+  CreateShare: !Or
+      - !Condition CreateOrgShare
+      - !Condition CreateOUShare
+  CreateRootShare: !And
+    - !Condition CreateShare
+    - !Not
+      - !Condition CreateSub1
+  CreateSub1Share: !And
+    - !Condition CreateShare
+    - !And
+      - !Condition CreateSub1
+      - !Not
+        - !Condition CreateSub2
+  CreateSub2Share: !And
+    - !Condition CreateShare
+    - !And
+      - !Condition CreateSub2
+      - !Not
+        - !Condition CreateSub3
+  CreateSub3Share: !And
+    - !Condition CreateShare
+    - !And
+      - !Condition CreateSub3
+      - !Not
+        - !Condition CreateSub4
+  CreateSub4Share: !And
+    - !Condition CreateShare
+    - !Condition CreateSub4
+
+Resources:
+  rLogCRLBucket:
+    Type: AWS::S3::Bucket
+    Condition: EnableCRLLog
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Ref pLogCRLBucket
+      AccessControl: LogDeliveryWrite
+      BucketEncryption: #SSE-S3 vs SSE-KMS, AWS vs Cusotmer KMS
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      #LifecycleConfiguration:
+      Tags: 
+        - Key: "Purpose"
+          Value: "ACMPCA CRL Access Logs"
+  rRootCRLBucket:
+    Type: AWS::S3::Bucket
+    Condition: EnableCRL
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Ref pRootCRLBucket
+      AccessControl: Private
+      LoggingConfiguration: !If
+        - EnableCRLLog
+        - DestinationBucketName: !Ref rLogCRLBucket
+          LogFilePrefix: RootCA
+        - !Ref "AWS::NoValue"
+      BucketEncryption: #SSE-S3 vs SSE-KMS, AWS vs Cusotmer KMS
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags: 
+        - Key: "Purpose"
+          Value: "ACMPCA Certificate Revocation List"
+  rRootCRLBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: EnableCRL
+    Properties:
+      Bucket: !Ref rRootCRLBucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowACMPCAPutObjectAccessForCRLAndChainCertificates
+            Action:
+              - "s3:GetBucketAcl"
+              - "s3:GetBucketLocation"
+              - "s3:PutObject"
+              - "s3:PutObjectAcl"
+            Effect: "Allow"
+            Resource:
+              - !Join ["", ["arn:aws:s3:::", !Ref pRootCRLBucket, "/*"]]
+              - !Join ["", ["arn:aws:s3:::", !Ref pRootCRLBucket]]
+            Principal:
+              Service:
+                - "acm-pca.amazonaws.com"
+  #Bucket Policy has to be created before using it in RootCA
+  BucketPolicyWaitHandle: 
+    Condition: EnableCRL
+    DependsOn: rRootCRLBucketPolicy
+    Type: "AWS::CloudFormation::WaitConditionHandle"
+  BlankWaitHandle: 
+    Type: "AWS::CloudFormation::WaitConditionHandle"
+  BucketPolicyWaitCondition: 
+    Type: "AWS::CloudFormation::WaitCondition"
+    Properties: 
+      Handle: !If [EnableCRL, !Ref BucketPolicyWaitHandle, !Ref BlankWaitHandle]
+      Timeout: "5" 
+      Count: 0
+  rRootCA:
+    Type: AWS::ACMPCA::CertificateAuthority
+    DependsOn: BucketPolicyWaitCondition 
+    Properties:
+      Type: ROOT
+      Subject:
+        CommonName: !Ref pRootCommonName
+        Organization: !Ref pOrganization
+        OrganizationalUnit: !Ref pOrganizationalUnit
+        Country: !Ref pCountry
+        State: !Ref pState
+        Locality: !Ref pLocality
+      KeyAlgorithm: !Ref pKeyAlgorithm
+      SigningAlgorithm: !Ref pSigningAlgorithm
+      RevocationConfiguration:
+        CrlConfiguration: !If
+          - EnableCRL
+          - Enabled: true
+            ExpirationInDays: !Ref pRootCRLExpiry
+            S3BucketName: !Ref rRootCRLBucket
+          - Enabled: false
+      Tags: 
+        - Key: "Purpose"
+          Value: "Root CA"
+  rRootCACert:
+    Type: "AWS::ACMPCA::Certificate"
+    Properties:
+      CertificateAuthorityArn: !Ref rRootCA
+      CertificateSigningRequest: !GetAtt rRootCA.CertificateSigningRequest
+      SigningAlgorithm: !Ref pSigningAlgorithm
+      TemplateArn: "arn:aws:acm-pca:::template/RootCACertificate/V1"
+      Validity:
+        Type: DAYS
+        Value: !Ref pRootCACertExpiry
+  rRootCAActivation:
+    Type: "AWS::ACMPCA::CertificateAuthorityActivation"
+    Properties:
+      CertificateAuthorityArn: !Ref rRootCA
+      Certificate: !GetAtt rRootCACert.Certificate
+      Status: ACTIVE
+  rSubordinateCA1:
+    Type: AWS::ACMPCA::CertificateAuthority
+    Condition: CreateSub1
+    DependsOn: rRootCA
+    Properties:
+      Type: SUBORDINATE
+      Subject:
+        CommonName: !Ref pSub1CommonName
+        Organization: !Ref pOrganization
+        OrganizationalUnit: !Ref pOrganizationalUnit
+        Country: !Ref pCountry
+        State: !Ref pState
+        Locality: !Ref pLocality
+      KeyAlgorithm: !Ref pKeyAlgorithm
+      SigningAlgorithm: !Ref pSigningAlgorithm
+      RevocationConfiguration:
+        CrlConfiguration: !If
+          - EnableCRL
+          - Enabled: true
+            ExpirationInDays: !Ref pSub1CRLExpiry
+            S3BucketName: !Ref rRootCRLBucket
+          - Enabled: false
+      Tags: 
+        - Key: "Purpose"
+          Value: "Subordinate CA1"
+  rSubordinateCA1Cert:
+    Type: "AWS::ACMPCA::Certificate"
+    Condition: CreateSub1
+    DependsOn: rRootCAActivation
+    Properties:
+      CertificateAuthorityArn: !Ref rRootCA
+      CertificateSigningRequest: !GetAtt rSubordinateCA1.CertificateSigningRequest
+      SigningAlgorithm: !Ref pSigningAlgorithm
+      TemplateArn: !If
+        - CreateSub4
+        - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen3/V1"
+        - !If
+          - CreateSub3
+          - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen2/V1"
+          - !If
+            - CreateSub2
+            - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen1/V1"
+            - !If
+              - CreateSub1
+              - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen0/V1"
+              - !Ref "AWS::NoValue"
+
+      Validity:
+        Type: DAYS
+        Value: !Ref pSub1CACertExpiry
+  rSubordinateCA1Activation:
+    Type: "AWS::ACMPCA::CertificateAuthorityActivation"
+    Condition: CreateSub1
+    Properties:
+      CertificateAuthorityArn: !Ref rSubordinateCA1
+      Certificate: !GetAtt rSubordinateCA1Cert.Certificate
+      CertificateChain: !GetAtt rRootCAActivation.CompleteCertificateChain
+      Status: ACTIVE
+  rSubordinateCA2:
+    Type: AWS::ACMPCA::CertificateAuthority
+    Condition: CreateSub2
+    DependsOn: rSubordinateCA1
+    Properties:
+      Type: SUBORDINATE
+      Subject:
+        CommonName: !Ref pSub2CommonName
+        Organization: !Ref pOrganization
+        OrganizationalUnit: !Ref pOrganizationalUnit
+        Country: !Ref pCountry
+        State: !Ref pState
+        Locality: !Ref pLocality
+      KeyAlgorithm: !Ref pKeyAlgorithm
+      SigningAlgorithm: !Ref pSigningAlgorithm
+      RevocationConfiguration:
+        CrlConfiguration: !If
+          - EnableCRL
+          - Enabled: true
+            ExpirationInDays: !Ref pSub2CRLExpiry
+            S3BucketName: !Ref rRootCRLBucket
+          - Enabled: false
+      Tags: 
+        - Key: "Purpose"
+          Value: "Subordinate CA2"
+  rSubordinateCA2Cert:
+    Type: "AWS::ACMPCA::Certificate"
+    Condition: CreateSub2
+    DependsOn: rSubordinateCA1Activation
+    Properties:
+      CertificateAuthorityArn: !Ref rSubordinateCA1Activation
+      CertificateSigningRequest: !GetAtt rSubordinateCA2.CertificateSigningRequest
+      SigningAlgorithm: !Ref pSigningAlgorithm
+      TemplateArn: !If
+        - CreateSub4
+        - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen2/V1"
+        - !If
+          - CreateSub3
+          - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen1/V1"
+          - !If
+            - CreateSub2
+            - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen0/V1"
+            - !Ref "AWS::NoValue"
+      Validity:
+        Type: DAYS
+        Value: !Ref pSub2CACertExpiry
+  rSubordinateCA2Activation:
+    Type: "AWS::ACMPCA::CertificateAuthorityActivation"
+    Condition: CreateSub2
+    Properties:
+      CertificateAuthorityArn: !Ref rSubordinateCA2
+      Certificate: !GetAtt rSubordinateCA2Cert.Certificate
+      CertificateChain: !GetAtt rSubordinateCA1Activation.CompleteCertificateChain
+      Status: ACTIVE
+  rSubordinateCA3:
+    Type: AWS::ACMPCA::CertificateAuthority
+    Condition: CreateSub3
+    DependsOn: rSubordinateCA2
+    Properties:
+      Type: SUBORDINATE
+      Subject:
+        CommonName: !Ref pSub3CommonName
+        Organization: !Ref pOrganization
+        OrganizationalUnit: !Ref pOrganizationalUnit
+        Country: !Ref pCountry
+        State: !Ref pState
+        Locality: !Ref pLocality
+      KeyAlgorithm: !Ref pKeyAlgorithm
+      SigningAlgorithm: !Ref pSigningAlgorithm
+      RevocationConfiguration:
+        CrlConfiguration: !If
+          - EnableCRL
+          - Enabled: true
+            ExpirationInDays: !Ref pSub3CRLExpiry
+            S3BucketName: !Ref rRootCRLBucket
+          - Enabled: false
+      Tags: 
+        - Key: "Purpose"
+          Value: "Subordinate CA3"
+  rSubordinateCA3Cert:
+    Type: "AWS::ACMPCA::Certificate"
+    Condition: CreateSub3
+    DependsOn: rSubordinateCA2Activation
+    Properties:
+      CertificateAuthorityArn: !Ref rSubordinateCA2Activation
+      CertificateSigningRequest: !GetAtt rSubordinateCA3.CertificateSigningRequest
+      SigningAlgorithm: !Ref pSigningAlgorithm
+      TemplateArn: !If
+        - CreateSub4
+        - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen1/V1"
+        - !If
+          - CreateSub3
+          - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen0/V1"
+          - !Ref "AWS::NoValue"
+      Validity:
+        Type: DAYS
+        Value: !Ref pSub3CACertExpiry
+  rSubordinateCA3Activation:
+    Type: "AWS::ACMPCA::CertificateAuthorityActivation"
+    Condition: CreateSub3
+    Properties:
+      CertificateAuthorityArn: !Ref rSubordinateCA3
+      Certificate: !GetAtt rSubordinateCA3Cert.Certificate
+      CertificateChain: !GetAtt rSubordinateCA2Activation.CompleteCertificateChain
+      Status: ACTIVE
+  rSubordinateCA4:
+    Type: AWS::ACMPCA::CertificateAuthority
+    Condition: CreateSub4
+    DependsOn: rSubordinateCA3
+    Properties:
+      Type: SUBORDINATE
+      Subject:
+        CommonName: !Ref pSub4CommonName
+        Organization: !Ref pOrganization
+        OrganizationalUnit: !Ref pOrganizationalUnit
+        Country: !Ref pCountry
+        State: !Ref pState
+        Locality: !Ref pLocality
+      KeyAlgorithm: !Ref pKeyAlgorithm
+      SigningAlgorithm: !Ref pSigningAlgorithm
+      RevocationConfiguration:
+        CrlConfiguration: !If
+          - EnableCRL
+          - Enabled: true
+            ExpirationInDays: !Ref pSub4CRLExpiry
+            S3BucketName: !Ref rRootCRLBucket
+          - Enabled: false
+      Tags: 
+        - Key: "Purpose"
+          Value: "Subordinate CA4"
+  rSubordinateCA4Cert:
+    Type: "AWS::ACMPCA::Certificate"
+    Condition: CreateSub4
+    DependsOn: rSubordinateCA3Activation
+    Properties:
+      CertificateAuthorityArn: !Ref rSubordinateCA3Activation
+      CertificateSigningRequest: !GetAtt rSubordinateCA4.CertificateSigningRequest
+      SigningAlgorithm: !Ref pSigningAlgorithm
+      TemplateArn: "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen0/V1"
+      Validity:
+        Type: DAYS
+        Value: !Ref pSub4CACertExpiry
+  rSubordinateCA4Activation:
+    Type: "AWS::ACMPCA::CertificateAuthorityActivation"
+    Condition: CreateSub4
+    Properties:
+      CertificateAuthorityArn: !Ref rSubordinateCA4
+      Certificate: !GetAtt rSubordinateCA4Cert.Certificate
+      CertificateChain: !GetAtt rSubordinateCA3Activation.CompleteCertificateChain
+      Status: ACTIVE
+  # Only turn this on if there are no subordinates, otherwise share out only lowest level subordinate
+  rRootShare:
+    Type: AWS::RAM::ResourceShare
+    Condition: CreateRootShare
+    DependsOn: rRootCAActivation
+    Properties:
+      AllowExternalPrincipals: false
+      Name: !Sub
+        - "RootCAResourceShare-${CommonName}"
+        - CommonName: !Ref pRootCommonName
+      Principals: !If
+        - CreateOUShare
+        - - !Sub "arn:aws:organizations::${pManagmentAccount}:ou/${pAWSOrganizationId}/${pAWSOrganizationalUnit}"
+        - !If
+          - CreateOrgShare
+          - - !Sub "arn:aws:organizations::${pManagmentAccount}:organization/${pAWSOrganizationId}"
+          - !Ref "AWS::NoValue"
+      ResourceArns:
+        - !Ref rRootCA
+      Tags: 
+        - Key: "Purpose"
+          Value: "Private CA for certificate signing"
+  rSubordinateCA1Share:
+    Type: AWS::RAM::ResourceShare
+    Condition: CreateSub1Share
+    DependsOn: rSubordinateCA1Activation
+    Properties:
+      AllowExternalPrincipals: false
+      Name: !Sub
+        - "SubordinateCAResourceShare-${CommonName}"
+        - CommonName: !Ref pSub1CommonName
+      Principals: !If
+        - CreateOUShare
+        - - !Sub "arn:aws:organizations::${pManagmentAccount}:ou/${pAWSOrganizationId}/${pAWSOrganizationalUnit}"
+        - !If
+          - CreateOrgShare
+          - - !Sub "arn:aws:organizations::${pManagmentAccount}:organization/${pAWSOrganizationId}"
+          - !Ref "AWS::NoValue"
+      ResourceArns:
+        - !Ref rSubordinateCA1
+      Tags: 
+        - Key: "Purpose"
+          Value: "Private CA for certificate signing"
+  rSubordinateCA2Share:
+    Type: AWS::RAM::ResourceShare
+    Condition: CreateSub2Share
+    DependsOn: rSubordinateCA2Activation
+    Properties:
+      AllowExternalPrincipals: false
+      Name: !Sub
+        - "SubordinateCAResourceShare-${CommonName}"
+        - CommonName: !Ref pSub2CommonName
+      Principals: !If
+        - CreateOUShare
+        - - !Sub "arn:aws:organizations::${pManagmentAccount}:ou/${pAWSOrganizationId}/${pAWSOrganizationalUnit}"
+        - !If
+          - CreateOrgShare
+          - - !Sub "arn:aws:organizations::${pManagmentAccount}:organization/${pAWSOrganizationId}"
+          - !Ref "AWS::NoValue"
+      ResourceArns:
+        - !Ref rSubordinateCA2
+      Tags: 
+        - Key: "Purpose"
+          Value: "Private CA for certificate signing"
+  rSubordinateCA3Share:
+    Type: AWS::RAM::ResourceShare
+    Condition: CreateSub3Share
+    DependsOn: rSubordinateCA3Activation
+    Properties:
+      AllowExternalPrincipals: false
+      Name: !Sub
+        - "SubordinateCAResourceShare-${CommonName}"
+        - CommonName: !Ref pSub3CommonName
+      Principals: !If
+        - CreateOUShare
+        - - !Sub "arn:aws:organizations::${pManagmentAccount}:ou/${pAWSOrganizationId}/${pAWSOrganizationalUnit}"
+        - !If
+          - CreateOrgShare
+          - - !Sub "arn:aws:organizations::${pManagmentAccount}:organization/${pAWSOrganizationId}"
+          - !Ref "AWS::NoValue"
+      ResourceArns:
+        - !Ref rSubordinateCA3
+      Tags: 
+        - Key: "Purpose"
+          Value: "Private CA for certificate signing"
+  rSubordinateCA4Share:
+    Type: AWS::RAM::ResourceShare
+    Condition: CreateSub4Share
+    DependsOn: rSubordinateCA4Activation
+    Properties:
+      AllowExternalPrincipals: false
+      Name: !Sub
+        - "SubordinateCAResourceShare-${CommonName}"
+        - CommonName: !Ref pSub4CommonName
+      Principals: !If
+        - CreateOUShare
+        - - !Sub "arn:aws:organizations::${pManagmentAccount}:ou/${pAWSOrganizationId}/${pAWSOrganizationalUnit}"
+        - !If
+          - CreateOrgShare
+          - - !Sub "arn:aws:organizations::${pManagmentAccount}:organization/${pAWSOrganizationId}"
+          - !Ref "AWS::NoValue"
+      ResourceArns:
+        - !Ref rSubordinateCA4
+      Tags: 
+        - Key: "Purpose"
+          Value: "Private CA for certificate signing"
+# output of stacks are buckets and end-entity subordinate
+Outputs:
+  oCRLBucket:
+    Condition: EnableCRL
+    Description: The CRL bucket
+    Value: !Ref rRootCRLBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-CRLBucket"
+  oAccessLogBucket:
+    Condition: EnableCRLLog
+    Description: The Access Log bucket
+    Value: !Ref rLogCRLBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-AccessLogBucket"
+  oRootCA:
+    Description: The ARN of the Root Certificate Authority that can be used by other stacks
+    Value: !Ref rRootCA
+    Export:
+      Name: !Sub "${AWS::StackName}-RootCA"  
+  oCertAuthority:
+    Condition: CreateShare
+    Description: The ARN of the Certificate Authority for issuing certificate
+    Value: !If
+        - CreateSub4Share
+        - rSubordinateCA3Activation.CompleteCertificateChain
+        - !If
+          - CreateSub3Share
+          - !Ref rSubordinateCA3
+          - !If
+            - CreateSub2Share
+            - !Ref rSubordinateCA2
+            - !If
+              - CreateSub1Share
+              - !Ref rSubordinateCA1
+              - !If
+                - CreateRootShare
+                - !Ref rRootCA
+                - !Ref "AWS::NoValue"
+    Export:
+      Name: !Sub "${AWS::StackName}-CertAuthority"

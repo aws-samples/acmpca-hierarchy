@@ -1,0 +1,63 @@
+[
+    {
+        "ParameterKey": "pOrganization",
+        "ParameterValue": "MyDomain LLC"
+    },
+    {
+        "ParameterKey": "pOrganizationalUnit",
+        "ParameterValue": "Cloud IT"
+    },
+    {
+        "ParameterKey": "pCountry",
+        "ParameterValue": "US"
+    },
+    {
+        "ParameterKey": "pState",
+        "ParameterValue": "California"
+    },
+    {
+        "ParameterKey": "pLocality",
+        "ParameterValue": "Los Angeles"
+    },
+    {
+        "ParameterKey": "pRootCommonName",
+        "ParameterValue": "nolog-mydomain.io"
+    },
+    {
+        "ParameterKey": "pSub1CommonName",
+        "ParameterValue": "subdomain1.nolog-mydomain.io"
+    },
+    {
+        "ParameterKey": "pSub2CommonName",
+        "ParameterValue": ""
+    },
+    {
+        "ParameterKey": "pSub3CommonName",
+        "ParameterValue": ""
+    },
+    {
+        "ParameterKey": "pSub4CommonName",
+        "ParameterValue": ""
+    },
+    {
+        "ParameterKey": "pLogCRLBucket",
+        "ParameterValue": ""
+    },
+    {
+        "ParameterKey": "pRootCRLBucket",
+        "ParameterValue": "mydomain-io-acmpca-crl-l5"
+    },
+    {
+        "ParameterKey": "pManagmentAccount",
+        "ParameterValue": "1111222233334444"
+    },
+    {
+        "ParameterKey": "pAWSOrganizationId",
+        "ParameterValue": "o-fortestorg"
+    },
+    {
+        "ParameterKey": "pAWSOrganizationalUnit",
+        "ParameterValue": "ou-foratestou"
+    }
+]
+

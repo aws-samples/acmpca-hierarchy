@@ -1,0 +1,63 @@
+[
+    {
+        "ParameterKey": "pOrganization",
+        "ParameterValue": "MyDomain LLC"
+    },
+    {
+        "ParameterKey": "pOrganizationalUnit",
+        "ParameterValue": "Cloud IT"
+    },
+    {
+        "ParameterKey": "pCountry",
+        "ParameterValue": "US"
+    },
+    {
+        "ParameterKey": "pState",
+        "ParameterValue": "California"
+    },
+    {
+        "ParameterKey": "pLocality",
+        "ParameterValue": "Los Angeles"
+    },
+    {
+        "ParameterKey": "pRootCommonName",
+        "ParameterValue": "mydomain.io"
+    },
+    {
+        "ParameterKey": "pSub1CommonName",
+        "ParameterValue": "subdomain1.l4-mydomain.io"
+    },
+    {
+        "ParameterKey": "pSub2CommonName",
+        "ParameterValue": "subdomain2.subdomain1.l4-mydomain.io"
+    },
+    {
+        "ParameterKey": "pSub3CommonName",
+        "ParameterValue": "subdomain3.subdomain2.subdomain1.l4-mydomain.io"
+    },
+    {
+        "ParameterKey": "pSub4CommonName",
+        "ParameterValue": "subdomain4.subdomain3.subdomain2.subdomain1.l4-mydomain.io"
+    },
+    {
+        "ParameterKey": "pLogCRLBucket",
+        "ParameterValue": "mydomain-io-acmpca-log-l4"
+    },
+    {
+        "ParameterKey": "pRootCRLBucket",
+        "ParameterValue": "mydomain-io-acmpca-crl-l4"
+    },
+    {
+        "ParameterKey": "pManagmentAccount",
+        "ParameterValue": "1111222233334444"
+    },
+    {
+        "ParameterKey": "pAWSOrganizationId",
+        "ParameterValue": "o-fortestorg"
+    },
+    {
+        "ParameterKey": "pAWSOrganizationalUnit",
+        "ParameterValue": "ou-foratestou"
+    }
+]
+
