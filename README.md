@@ -36,7 +36,7 @@ Use this solution in an AWS Organization environment needing multi-level hierarc
 
 To use this solution with AWS Organizations, the following is recommended:
 - Use a Security account for creating the CA Hierarchy and the share.
-- Disable [Amazon S3 block public access](https://aws.amazon.com/blogs/aws/amazon-s3-block-public-access-another-layer-of-protection-for-your-accounts-and-buckets/) at the account level when deploying this solution. This allows you to use the resource policy for the CRL bucket which is configured in this solution to only allow writes from acm-pca.amazonaws.com.
+- Disable [Amazon S3 block public access](https://aws.amazon.com/blogs/aws/amazon-s3-block-public-access-another-layer-of-protection-for-your-accounts-and-buckets/) at the account level temporarily when deploying this solution. This allows you to use the resource policy for the CRL bucket which is configured in this solution to only allow writes from acm-pca.amazonaws.com.
 - Use a separate OU (e.g. Sandbox OU) with one or more accounts for testing certificate management.
 - [Enable sharing](https://docs.aws.amazon.com/ram/latest/userguide/getting-started-sharing.html#getting-started-sharing-orgs) within the management account.
 
