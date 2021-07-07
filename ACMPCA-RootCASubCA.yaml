@@ -357,6 +357,9 @@ Resources:
     Properties:
       BucketName: !Ref pRootCRLBucket
       AccessControl: Private
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
       LoggingConfiguration: !If
         - EnableCRLLog
         - DestinationBucketName: !Ref rLogCRLBucket
@@ -422,6 +425,7 @@ Resources:
           - Enabled: true
             ExpirationInDays: !Ref pRootCRLExpiry
             S3BucketName: !Ref rRootCRLBucket
+            S3ObjectAcl: "BUCKET_OWNER_FULL_CONTROL"
           - Enabled: false
       Tags: 
         - Key: "Purpose"
@@ -463,6 +467,7 @@ Resources:
           - Enabled: true
             ExpirationInDays: !Ref pSub1CRLExpiry
             S3BucketName: !Ref rRootCRLBucket
+            S3ObjectAcl: "BUCKET_OWNER_FULL_CONTROL"
           - Enabled: false
       Tags: 
         - Key: "Purpose"
@@ -521,6 +526,7 @@ Resources:
           - Enabled: true
             ExpirationInDays: !Ref pSub2CRLExpiry
             S3BucketName: !Ref rRootCRLBucket
+            S3ObjectAcl: "BUCKET_OWNER_FULL_CONTROL"
           - Enabled: false
       Tags: 
         - Key: "Purpose"
@@ -575,6 +581,7 @@ Resources:
           - Enabled: true
             ExpirationInDays: !Ref pSub3CRLExpiry
             S3BucketName: !Ref rRootCRLBucket
+            S3ObjectAcl: "BUCKET_OWNER_FULL_CONTROL"
           - Enabled: false
       Tags: 
         - Key: "Purpose"
@@ -626,6 +633,7 @@ Resources:
           - Enabled: true
             ExpirationInDays: !Ref pSub4CRLExpiry
             S3BucketName: !Ref rRootCRLBucket
+            S3ObjectAcl: "BUCKET_OWNER_FULL_CONTROL"
           - Enabled: false
       Tags: 
         - Key: "Purpose"
