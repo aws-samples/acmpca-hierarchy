@@ -30,7 +30,7 @@ This solution has following features and benefits:
 
 - All CAs will reside in a single account and in a single region.
 - Customer generated certificates and keys are NOT required to be imported into the CA.
-- The CRL bucket does not require public access.
+- The CRL bucket does not require public access. Best practice recommends keeping the CRL private. If internet access to the CRL is required, see using Amazon CloudFront to serve the CRLs within the [Enabling the S3 Block Public Access feature](https://docs.aws.amazon.com/acm-pca/latest/userguide/PcaCreateCa.html#s3-bpa) of the AWS Private Certificate Authority documentation.
 
 Use this solution in an AWS Organization environment needing multi-level hierarchy CA or alternatively implement the solution without AWS RAM sharing within a single account. See the AWS whitepaper for [Recommended OUs](https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/recommended-ous.html). 
 
