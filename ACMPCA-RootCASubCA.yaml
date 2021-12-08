@@ -252,7 +252,7 @@ Metadata:
         default: AWS Organizations Managment Account
       pAWSOrganizationId:
         default: AWS Organization Id
-      pAWSOrganizationUnit:
+      pAWSOrganizationalUnit:
         default: AWS Organizational Unit
 
 Conditions:
@@ -346,6 +346,10 @@ Resources:
             reason: "This is logging bucket, AccessControl = LogDeliveryWrite"
           - id: W35
             reason: "The solution does not require access logging for this bucket"
+      cfn-lint:
+        config:
+          ignore_checks:
+            - W3011
     Condition: EnableCRLLog
     DeletionPolicy: Retain
     Properties:
@@ -367,6 +371,11 @@ Resources:
   rRootCRLBucket:
   # checkov:skip=CKV_AWS_21: The solution does not require versioning on S3
     Type: AWS::S3::Bucket
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - W3011
     Condition: EnableCRL
     DeletionPolicy: Retain
     Properties:
@@ -553,6 +562,11 @@ Resources:
           Value: "Subordinate CA2"
   rSubordinateCA2Cert:
     Type: "AWS::ACMPCA::Certificate"
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - W3005
     Condition: CreateSub2
     DependsOn: rSubordinateCA1Activation
     Properties:
@@ -608,6 +622,11 @@ Resources:
           Value: "Subordinate CA3"
   rSubordinateCA3Cert:
     Type: "AWS::ACMPCA::Certificate"
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - W3005
     Condition: CreateSub3
     DependsOn: rSubordinateCA2Activation
     Properties:
@@ -660,6 +679,11 @@ Resources:
           Value: "Subordinate CA4"
   rSubordinateCA4Cert:
     Type: "AWS::ACMPCA::Certificate"
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - W3005
     Condition: CreateSub4
     DependsOn: rSubordinateCA3Activation
     Properties:
