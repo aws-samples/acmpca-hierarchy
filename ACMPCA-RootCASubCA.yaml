@@ -336,7 +336,16 @@ Conditions:
 
 Resources:
   rLogCRLBucket:
+  # checkov:skip=CKV_AWS_18: The solution does not require access logging for this bucket.
+  # checkov:skip=CKV_AWS_21: The solution does not require versioning on S3
     Type: AWS::S3::Bucket
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W51
+            reason: "This is logging bucket, AccessControl = LogDeliveryWrite"
+          - id: W35
+            reason: "The solution does not require access logging for this bucket"
     Condition: EnableCRLLog
     DeletionPolicy: Retain
     Properties:
@@ -350,7 +359,13 @@ Resources:
       Tags: 
         - Key: "Purpose"
           Value: "ACMPCA CRL Access Logs"
+      PublicAccessBlockConfiguration:
+        RestrictPublicBuckets: True
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
   rRootCRLBucket:
+  # checkov:skip=CKV_AWS_21: The solution does not require versioning on S3
     Type: AWS::S3::Bucket
     Condition: EnableCRL
     DeletionPolicy: Retain
@@ -372,6 +387,11 @@ Resources:
       Tags: 
         - Key: "Purpose"
           Value: "ACMPCA Certificate Revocation List"
+      PublicAccessBlockConfiguration:
+        RestrictPublicBuckets: True
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
   rRootCRLBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Condition: EnableCRL
