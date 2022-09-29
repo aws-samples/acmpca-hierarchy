@@ -41,11 +41,11 @@
     },
     {
         "ParameterKey": "pLogCRLBucket",
-        "ParameterValue": "mydomain-io-acmpca-log-l0"
+        "ParameterValue": "mydomain-io-awspca-log-l0"
     },
     {
         "ParameterKey": "pRootCRLBucket",
-        "ParameterValue": "mydomain-io-acmpca-crl-l0"
+        "ParameterValue": "mydomain-io-awspca-crl-l0"
     },
     {
         "ParameterKey": "pManagmentAccount",

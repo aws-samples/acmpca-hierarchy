@@ -1,17 +1,17 @@
-# AWS Certificate Manager (ACM) Private CA (PCA) shared to AWS Organizations via AWS Resource Access Manager (AWS RAM)
+# AWS Private Certificate Authority (AWS Private CA) shared to AWS Organizations via AWS Resource Access Manager (AWS RAM)
 
-Large organizations often build a public key infrastructure (PKI) inside the AWS cloud, intended for private use within an organization. With AWS Certificate Manager (ACM) Private CA (PCA), you create your own CA hierarchy and issue certificates with it for authenticating internal users, computers, applications, services, servers, and other devices, and for signing computer code. Certificates issued by a private CA are trusted only within your organization, not on the public internet.
+Large organizations often build a public key infrastructure (PKI) inside the AWS cloud, intended for private use within an organization. With AWS Private Certificate Authority (AWS Private CA), you create your own CA hierarchy and issue certificates with it for authenticating internal users, computers, applications, services, servers, and other devices, and for signing computer code. Certificates issued by a private CA are trusted only within your organization, not on the public internet.
 
 AWS Resource Access Manager (AWS RAM) allows you to securely share AWS resources within your AWS Organization. Private CA Cross-Account Sharing, gives you the ability to grant permissions for other accounts to use a centralized CA to generate and issue certificates while using the AWS RAM to manage the permissions. This removes the need for a Private CA in every account, saving you money for each CA created, which is a more cost-effective way of deployment. 
 
 See also:  
-[Designing a CA hierarchy](https://docs.aws.amazon.com/acm-pca/latest/userguide/ca-hierarchy.html)  
-[Creating a private CA and CRL](https://docs.aws.amazon.com/acm-pca/latest/userguide/PcaCreateCa.html)  
+[Designing a CA hierarchy](https://docs.aws.amazon.com/privateca/latest/userguide/ca-hierarchy.html)  
+[Creating a private CA](https://docs.aws.amazon.com/privateca/latest/userguide/create-CA.html)  
 [How to use AWS RAM to share your ACM Private CA cross-account](https://aws.amazon.com/blogs/security/how-to-use-aws-ram-to-share-your-acm-private-ca-cross-account/)
 
 This solution has following features and benefits:
 
-- Centralize and simplify management of the private CA hierarchy using AWS ACM Private CA.
+- Centralize and simplify management of the private CA hierarchy using AWS Private CA.
 - Export certificates and keys to customer managed devices in AWS and on-premises.
 - Uses an AWS CloudFormation template for a rapid deployment and consistent provisioning experience.
 - Create a private root CA along with either 1, 2, 3 or 4 subordinate CA hierarchy.
@@ -30,7 +30,7 @@ This solution has following features and benefits:
 
 - All CAs will reside in a single account and in a single region.
 - Customer generated certificates and keys are NOT required to be imported into the CA.
-- The CRL bucket does not require public access. Best practice recommends keeping the CRL private. If internet access to the CRL is required, see using Amazon CloudFront to serve the CRLs within the [Enabling the S3 Block Public Access feature](https://docs.aws.amazon.com/acm-pca/latest/userguide/PcaCreateCa.html#s3-bpa) of the AWS Private Certificate Authority documentation.
+- The CRL bucket does not require public access. Best practice recommends keeping the CRL private. If internet access to the CRL is required, see using Amazon CloudFront to serve the CRLs within the [Enabling the S3 Block Public Access feature](https://docs.aws.amazon.com/privateca/latest/userguide/crl-planning.html#s3-bpa) of the AWS Private CA documentation.
 
 Use this solution in an AWS Organization environment needing multi-level hierarchy CA or alternatively implement the solution without AWS RAM sharing within a single account. See the AWS whitepaper for [Recommended OUs](https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/recommended-ous.html). 
 
@@ -50,14 +50,14 @@ This solution provides two options for sharing to AWS Organizations:
 
 # Alternatives
 
-This solution provides a single AWS Region, CA hierarchy with optional cross-account sharing via AWS RAM. ACM Private CA is a regional service so this solution only allows sharing cross-account within the same AWS Region. However, alternate usage patterns could be applied to this solution either by extending it or manually creating additional resources. Some examples of alternate usage patterns are:
+This solution provides a single AWS Region, CA hierarchy with optional cross-account sharing via AWS RAM. AWS Private CA is a regional service so this solution only allows sharing cross-account within the same AWS Region. However, alternate usage patterns could be applied to this solution either by extending it or manually creating additional resources. Some examples of alternate usage patterns are:
 
 - A CA hierarchy with the root outside of AWS
     - Subordinates will need to be signed and activated manually
 - A CA hierarchy with some subordinates outside of AWS
     - Use this solution to create the single AWS Region CA hierarchy, then manually add subordinates from outside of AWS
 - A CA hierarchy all within AWS but involving multiple AWS Regions
-    - Create the regional CA hierarchy with this solution, then manually add a subordinate hierarchy to the original root CA in other AWS Regions. See https://docs.aws.amazon.com/acm-pca/latest/userguide/PcaExternalRoot.html for more information.
+    - Create the regional CA hierarchy with this solution, then manually add a subordinate hierarchy to the original root CA in other AWS Regions. See https://docs.aws.amazon.com/privateca/latest/userguide/PcaExternalRoot.html for more information.
 
 # Test Cases
 
@@ -86,31 +86,31 @@ Use the AWS CLI for easy testing. ***Make sure you are using the security accoun
 *Modify the parameter files with your management account, orgID, OU and bucket names*
 
 ```
-aws cloudformation create-stack --stack-name testStack-L0 --template-body file://ACMPCA-RootCASubCA.yaml --parameters file://testStackL0.json
+aws cloudformation create-stack --stack-name testStack-L0 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL0.json
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-L1 --template-body file://ACMPCA-RootCASubCA.yaml --parameters file://testStackL1.json
+aws cloudformation create-stack --stack-name testStack-L1 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL1.json
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-L2 --template-body file://ACMPCA-RootCASubCA.yaml --parameters file://testStackL2.json
+aws cloudformation create-stack --stack-name testStack-L2 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL2.json
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-L3 --template-body file://ACMPCA-RootCASubCA.yaml --parameters file://testStackL3.json
+aws cloudformation create-stack --stack-name testStack-L3 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL3.json
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-L4 --template-body file://ACMPCA-RootCASubCA.yaml --parameters file://testStackL4.json
+aws cloudformation create-stack --stack-name testStack-L4 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4.json
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-NoCRL --template-body file://ACMPCA-RootCASubCA.yaml --parameters file://testStack-NoCRL.json
+aws cloudformation create-stack --stack-name testStack-NoCRL --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStack-NoCRL.json
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-NoLogBucket --template-body file://ACMPCA-RootCASubCA.yaml --parameters file://testStack-NoLogBucket.json
+aws cloudformation create-stack --stack-name testStack-NoLogBucket --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStack-NoLogBucket.json
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-orgShare --template-body file://ACMPCA-RootCASubCA.yaml --parameters file://testStackL4-orgShare.json
+aws cloudformation create-stack --stack-name testStack-orgShare --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4-orgShare.json
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-noShare --template-body file://ACMPCA-RootCASubCA.yaml --parameters file://testStackL4-noShare.json
+aws cloudformation create-stack --stack-name testStack-noShare --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4-noShare.json
 ```
 
 ## Certificate Lifecycle Tests
@@ -148,32 +148,32 @@ AWS CLI or AWS Console can be used to clean up resources created for testing.
 See the sample AWS CLI command below for cleanup (*use your bucket names*):
 ```
 aws cloudformation delete-stack --stack-name testStack-L0
-aws s3 rb s3://mydomain-io-acmpca-crl-l0 --force
-aws s3 rb s3://mydomain-io-acmpca-log-l0 --force
+aws s3 rb s3://mydomain-io-awspca-crl-l0 --force
+aws s3 rb s3://mydomain-io-awspca-log-l0 --force
 ```
 ```
 aws cloudformation delete-stack --stack-name testStack-L1
-aws s3 rb s3://mydomain-io-acmpca-crl-l1 --force
-aws s3 rb s3://mydomain-io-acmpca-log-l1 --force
+aws s3 rb s3://mydomain-io-awspca-crl-l1 --force
+aws s3 rb s3://mydomain-io-awspca-log-l1 --force
 ```
 ```
 aws cloudformation delete-stack --stack-name testStack-L2
-aws s3 rb s3://mydomain-io-acmpca-crl-l2 --force
-aws s3 rb s3://mydomain-io-acmpca-log-l2 --force
+aws s3 rb s3://mydomain-io-awspca-crl-l2 --force
+aws s3 rb s3://mydomain-io-awspca-log-l2 --force
 ```
 ```
 aws cloudformation delete-stack --stack-name testStack-L3
-aws s3 rb s3://mydomain-io-acmpca-crl-l3 --force
-aws s3 rb s3://mydomain-io-acmpca-log-l3 --force
+aws s3 rb s3://mydomain-io-awspca-crl-l3 --force
+aws s3 rb s3://mydomain-io-awspca-log-l3 --force
 ```
 ```
 aws cloudformation delete-stack --stack-name testStack-L4
-aws s3 rb s3://mydomain-io-acmpca-crl-l4 --force
-aws s3 rb s3://mydomain-io-acmpca-log-l4 --force
+aws s3 rb s3://mydomain-io-awspca-crl-l4 --force
+aws s3 rb s3://mydomain-io-awspca-log-l4 --force
 ```
 ```
 aws cloudformation delete-stack --stack-name testStack-NoLogBucket
-aws s3 rb s3://mydomain-io-acmpca-crl-l5 --force
+aws s3 rb s3://mydomain-io-awspca-crl-l5 --force
 ```
 ```
 aws cloudformation delete-stack --stack-name testStack-NoCRL

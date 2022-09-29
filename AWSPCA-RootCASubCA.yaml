@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
 Description: >
-  This AWS CloudFormation template deploys an AWS ACM Private CA with a multi-level, 
+  This AWS CloudFormation template deploys an AWS Private CA with a multi-level, 
   subordinate hierarchy in a specified AWS Region and account. It supports conditionally
   specifying the level of subordination. For example, create a root and one subordinate
   CA (two CA level hierarchy) by leaving the parameters of subordinates 2-4 blank.
@@ -10,8 +10,8 @@ Description: >
   to an AWS organization or organizational unit via AWS Resource Access Manager (AWS RAM).
 
 # See also https://aws.amazon.com/blogs/security/how-to-use-aws-ram-to-share-your-acm-private-ca-cross-account/
-#          https://docs.aws.amazon.com/acm-pca/latest/userguide/ca-hierarchy.html
-#          https://docs.aws.amazon.com/acm-pca/latest/userguide/PcaCreateCa.html
+#          https://docs.aws.amazon.com/privateca/latest/userguide/ca-hierarchy.html
+#          https://docs.aws.amazon.com/privateca/latest/userguide/create-CA.html
 
 Parameters:
   # Certificate Subject Info
@@ -126,10 +126,10 @@ Parameters:
     Default: 30
   # Optional buckets
   pRootCRLBucket:
-    Description: Name of S3 bucket for the CRL, e.g. mydomain-io-acmpca-crl. Leaving this blank will disable CRL.
+    Description: Name of S3 bucket for the CRL, e.g. mydomain-io-awspca-crl. Leaving this blank will disable CRL.
     Type: String
   pLogCRLBucket:
-    Description: Name of S3 bucket where the log of CRL access is stored, e.g. mydomain-io-acmpca-log. Leaving this blank will disable CRL access logging.
+    Description: Name of S3 bucket where the log of CRL access is stored, e.g. mydomain-io-awspca-log. Leaving this blank will disable CRL access logging.
     Type: String
   # AWS Organization Account Info
   pManagmentAccount:
@@ -249,7 +249,7 @@ Metadata:
       pLogCRLBucket:
         default: Log Bucket Name
       pManagmentAccount:
-        default: AWS Organizations Managment Account
+        default: AWS Organizations Management Account
       pAWSOrganizationId:
         default: AWS Organization Id
       pAWSOrganizationalUnit:
@@ -355,14 +355,14 @@ Resources:
     Properties:
       BucketName: !Ref pLogCRLBucket
       AccessControl: LogDeliveryWrite
-      BucketEncryption: #SSE-S3 vs SSE-KMS, AWS vs Cusotmer KMS
+      BucketEncryption: #SSE-S3 vs SSE-KMS, AWS vs Customer KMS
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
       #LifecycleConfiguration:
       Tags: 
         - Key: "Purpose"
-          Value: "ACMPCA CRL Access Logs"
+          Value: "AWSPCA CRL Access Logs"
       PublicAccessBlockConfiguration:
         RestrictPublicBuckets: True
         BlockPublicAcls: True
@@ -389,13 +389,13 @@ Resources:
         - DestinationBucketName: !Ref rLogCRLBucket
           LogFilePrefix: RootCA
         - !Ref "AWS::NoValue"
-      BucketEncryption: #SSE-S3 vs SSE-KMS, AWS vs Cusotmer KMS
+      BucketEncryption: #SSE-S3 vs SSE-KMS, AWS vs Customer KMS
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
       Tags: 
         - Key: "Purpose"
-          Value: "ACMPCA Certificate Revocation List"
+          Value: "AWSPCA Certificate Revocation List"
       PublicAccessBlockConfiguration:
         RestrictPublicBuckets: True
         BlockPublicAcls: True
@@ -408,7 +408,7 @@ Resources:
       Bucket: !Ref rRootCRLBucket
       PolicyDocument:
         Statement:
-          - Sid: AllowACMPCAPutObjectAccessForCRLAndChainCertificates
+          - Sid: AllowAWSPCAPutObjectAccessForCRLAndChainCertificates
             Action:
               - "s3:GetBucketAcl"
               - "s3:GetBucketLocation"

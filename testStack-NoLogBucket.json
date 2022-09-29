@@ -45,7 +45,7 @@
     },
     {
         "ParameterKey": "pRootCRLBucket",
-        "ParameterValue": "mydomain-io-acmpca-crl-l5"
+        "ParameterValue": "mydomain-io-awspca-crl-l5"
     },
     {
         "ParameterKey": "pManagmentAccount",
