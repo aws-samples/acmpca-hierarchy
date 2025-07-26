@@ -8,6 +8,7 @@ See also:
 [Designing a CA hierarchy](https://docs.aws.amazon.com/privateca/latest/userguide/ca-hierarchy.html)  
 [Creating a private CA](https://docs.aws.amazon.com/privateca/latest/userguide/create-CA.html)  
 [How to use AWS RAM to share your ACM Private CA cross-account](https://aws.amazon.com/blogs/security/how-to-use-aws-ram-to-share-your-acm-private-ca-cross-account/)
+[The AWS Prescriptive Guidance for this repository](https://docs.aws.amazon.com/prescriptive-guidance/latest/patterns/simplify-private-certificate-management-by-using-aws-private-ca-and-aws-ram.html)
 
 This solution has following features and benefits:
 
@@ -25,6 +26,12 @@ This solution has following features and benefits:
 - Use the AWS CloudFormation template via either the AWS console or AWS Command Line Interface (CLI).  
 - The template parameter descriptions walk you through the console usage.  
 - See the Test Cases below for CLI usage.  
+
+# Limitations
+- AWS recommends using Amazon CloudFront to serve CRLs to clients, see [Enable S3 Block Public Access (BPA) with CloudFront](https://docs.aws.amazon.com/privateca/latest/userguide/crl-planning.html#s3-bpa). This AWS CloudFormation template does not have CloudFront creation capabilities at this time. One may add this capability to the template themselves or enable it manually after stack creation.
+- This AWS CloudFormation template does not have OCSP enablement capabilities at this time. One may add this capability to the template themselves or enable it manually after stack creation.
+- This AWS CloudFormation template does not enable permissions for ACM at this time, see [AWS::ACMPCA::Permission](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-acmpca-permission.html). One may add this capability to the template themselves or enable it manually after stack creation.
+- Private CA Connectors for AD and SCEP require prerequisites that are out of scope for this solution.
 
 # Prerequisites
 
@@ -86,31 +93,31 @@ Use the AWS CLI for easy testing. ***Make sure you are using the security accoun
 *Modify the parameter files with your management account, orgID, OU and bucket names*
 
 ```
-aws cloudformation create-stack --stack-name testStack-L0 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL0.json
+aws cloudformation create-stack --stack-name testStack-L0 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL0.json --capabilities CAPABILITY_AUTO_EXPAND
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-L1 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL1.json
+aws cloudformation create-stack --stack-name testStack-L1 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL1.json --capabilities CAPABILITY_AUTO_EXPAND
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-L2 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL2.json
+aws cloudformation create-stack --stack-name testStack-L2 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL2.json --capabilities CAPABILITY_AUTO_EXPAND
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-L3 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL3.json
+aws cloudformation create-stack --stack-name testStack-L3 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL3.json --capabilities CAPABILITY_AUTO_EXPAND
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-L4 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4.json
+aws cloudformation create-stack --stack-name testStack-L4 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4.json --capabilities CAPABILITY_AUTO_EXPAND
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-NoCRL --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStack-NoCRL.json
+aws cloudformation create-stack --stack-name testStack-NoCRL --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStack-NoCRL.json --capabilities CAPABILITY_AUTO_EXPAND
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-NoLogBucket --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStack-NoLogBucket.json
+aws cloudformation create-stack --stack-name testStack-NoLogBucket --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStack-NoLogBucket.json --capabilities CAPABILITY_AUTO_EXPAND
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-orgShare --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4-orgShare.json
+aws cloudformation create-stack --stack-name testStack-orgShare --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4-orgShare.json --capabilities CAPABILITY_AUTO_EXPAND
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-noShare --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4-noShare.json
+aws cloudformation create-stack --stack-name testStack-noShare --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4-noShare.json --capabilities CAPABILITY_AUTO_EXPAND
 ```
 
 ## Certificate Lifecycle Tests

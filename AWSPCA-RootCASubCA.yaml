@@ -1,5 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
+Transform: AWS::LanguageExtensions
+
 Description: >
   This AWS CloudFormation template deploys an AWS Private CA with a multi-level, 
   subordinate hierarchy in a specified AWS Region and account. It supports conditionally
@@ -9,7 +11,8 @@ Description: >
   access logging and optionally share the end-entity certificate generating subordinate
   to an AWS organization or organizational unit via AWS Resource Access Manager (AWS RAM).
 
-# See also https://aws.amazon.com/blogs/security/how-to-use-aws-ram-to-share-your-acm-private-ca-cross-account/
+# See also https://docs.aws.amazon.com/prescriptive-guidance/latest/patterns/simplify-private-certificate-management-by-using-aws-private-ca-and-aws-ram.html
+#          https://aws.amazon.com/blogs/security/how-to-use-aws-ram-to-share-your-acm-private-ca-cross-account/
 #          https://docs.aws.amazon.com/privateca/latest/userguide/ca-hierarchy.html
 #          https://docs.aws.amazon.com/privateca/latest/userguide/create-CA.html
 
@@ -198,7 +201,7 @@ Metadata:
           - pManagmentAccount
           - pAWSOrganizationId
           - pAWSOrganizationalUnit
-    #Define user friendly names for the parameters
+    # Define user friendly names for the parameters
     ParameterLabels:
       pOrganization:
         default: Organization
@@ -355,11 +358,11 @@ Resources:
     Properties:
       BucketName: !Ref pLogCRLBucket
       AccessControl: LogDeliveryWrite
-      BucketEncryption: #SSE-S3 vs SSE-KMS, AWS vs Customer KMS
+      BucketEncryption: # SSE-S3 vs SSE-KMS, AWS vs Customer KMS
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
-      #LifecycleConfiguration:
+      # LifecycleConfiguration:
       Tags: 
         - Key: "Purpose"
           Value: "AWSPCA CRL Access Logs"
@@ -389,7 +392,7 @@ Resources:
         - DestinationBucketName: !Ref rLogCRLBucket
           LogFilePrefix: RootCA
         - !Ref "AWS::NoValue"
-      BucketEncryption: #SSE-S3 vs SSE-KMS, AWS vs Customer KMS
+      BucketEncryption: # SSE-S3 vs SSE-KMS, AWS vs Customer KMS
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
@@ -421,7 +424,7 @@ Resources:
             Principal:
               Service:
                 - "acm-pca.amazonaws.com"
-  #Bucket Policy has to be created before using it in RootCA
+  # Bucket Policy has to be created before using it in RootCA
   BucketPolicyWaitHandle: 
     Condition: EnableCRL
     DependsOn: rRootCRLBucketPolicy
@@ -475,234 +478,77 @@ Resources:
       CertificateAuthorityArn: !Ref rRootCA
       Certificate: !GetAtt rRootCACert.Certificate
       Status: ACTIVE
-  rSubordinateCA1:
-    Type: AWS::ACMPCA::CertificateAuthority
-    Condition: CreateSub1
-    DependsOn: rRootCA
-    Properties:
-      Type: SUBORDINATE
-      Subject:
-        CommonName: !Ref pSub1CommonName
-        Organization: !Ref pOrganization
-        OrganizationalUnit: !Ref pOrganizationalUnit
-        Country: !Ref pCountry
-        State: !Ref pState
-        Locality: !Ref pLocality
-      KeyAlgorithm: !Ref pKeyAlgorithm
-      SigningAlgorithm: !Ref pSigningAlgorithm
-      RevocationConfiguration:
-        CrlConfiguration: !If
-          - EnableCRL
-          - Enabled: true
-            ExpirationInDays: !Ref pSub1CRLExpiry
-            S3BucketName: !Ref rRootCRLBucket
-            S3ObjectAcl: "BUCKET_OWNER_FULL_CONTROL"
-          - Enabled: false
-      Tags: 
-        - Key: "Purpose"
-          Value: "Subordinate CA1"
-  rSubordinateCA1Cert:
-    Type: "AWS::ACMPCA::Certificate"
-    Condition: CreateSub1
-    DependsOn: rRootCAActivation
-    Properties:
-      CertificateAuthorityArn: !Ref rRootCA
-      CertificateSigningRequest: !GetAtt rSubordinateCA1.CertificateSigningRequest
-      SigningAlgorithm: !Ref pSigningAlgorithm
-      TemplateArn: !If
-        - CreateSub4
-        - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen3/V1"
-        - !If
-          - CreateSub3
-          - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen2/V1"
-          - !If
-            - CreateSub2
-            - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen1/V1"
+  # Iterate through creation of requested subordinates
+  'Fn::ForEach::SubordinateCA':
+    - Level
+    - ["1", "2", "3", "4"]
+    - 'rSubordinateCA${Level}':
+        Type: AWS::ACMPCA::CertificateAuthority
+        Condition: !Sub 'CreateSub${Level}'
+        DependsOn: rRootCA
+        Properties:
+          Type: SUBORDINATE
+          Subject:
+            CommonName: !Ref
+              'Fn::Sub': 'pSub${Level}CommonName'
+            Organization: !Ref pOrganization
+            OrganizationalUnit: !Ref pOrganizationalUnit
+            Country: !Ref pCountry
+            State: !Ref pState
+            Locality: !Ref pLocality
+          KeyAlgorithm: !Ref pKeyAlgorithm
+          SigningAlgorithm: !Ref pSigningAlgorithm
+          RevocationConfiguration:
+            CrlConfiguration: !If
+              - EnableCRL
+              - Enabled: true
+                ExpirationInDays: !Ref
+                  'Fn::Sub': 'pSub${Level}CRLExpiry'
+                S3BucketName: !Ref rRootCRLBucket
+                S3ObjectAcl: "BUCKET_OWNER_FULL_CONTROL"
+              - Enabled: false
+          Tags: 
+            - Key: "Purpose"
+              Value: !Sub 'Subordinate CA${Level}'
+      'rSubordinateCA${Level}Cert':
+        Type: "AWS::ACMPCA::Certificate"
+        Condition: !Sub 'CreateSub${Level}'
+        DependsOn: rRootCAActivation
+        Properties:
+          CertificateAuthorityArn: !Ref rRootCA
+          CertificateSigningRequest: !GetAtt
+            - 'Fn::Sub': 'rSubordinateCA${Level}'
+            - CertificateSigningRequest
+          SigningAlgorithm: !Ref pSigningAlgorithm
+          TemplateArn: !If
+            - CreateSub4
+            - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen3/V1"
             - !If
-              - CreateSub1
-              - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen0/V1"
-              - !Ref "AWS::NoValue"
-
-      Validity:
-        Type: DAYS
-        Value: !Ref pSub1CACertExpiry
-  rSubordinateCA1Activation:
-    Type: "AWS::ACMPCA::CertificateAuthorityActivation"
-    Condition: CreateSub1
-    Properties:
-      CertificateAuthorityArn: !Ref rSubordinateCA1
-      Certificate: !GetAtt rSubordinateCA1Cert.Certificate
-      CertificateChain: !GetAtt rRootCAActivation.CompleteCertificateChain
-      Status: ACTIVE
-  rSubordinateCA2:
-    Type: AWS::ACMPCA::CertificateAuthority
-    Condition: CreateSub2
-    DependsOn: rSubordinateCA1
-    Properties:
-      Type: SUBORDINATE
-      Subject:
-        CommonName: !Ref pSub2CommonName
-        Organization: !Ref pOrganization
-        OrganizationalUnit: !Ref pOrganizationalUnit
-        Country: !Ref pCountry
-        State: !Ref pState
-        Locality: !Ref pLocality
-      KeyAlgorithm: !Ref pKeyAlgorithm
-      SigningAlgorithm: !Ref pSigningAlgorithm
-      RevocationConfiguration:
-        CrlConfiguration: !If
-          - EnableCRL
-          - Enabled: true
-            ExpirationInDays: !Ref pSub2CRLExpiry
-            S3BucketName: !Ref rRootCRLBucket
-            S3ObjectAcl: "BUCKET_OWNER_FULL_CONTROL"
-          - Enabled: false
-      Tags: 
-        - Key: "Purpose"
-          Value: "Subordinate CA2"
-  rSubordinateCA2Cert:
-    Type: "AWS::ACMPCA::Certificate"
-    Metadata:
-      cfn-lint:
-        config:
-          ignore_checks:
-            - W3005
-    Condition: CreateSub2
-    DependsOn: rSubordinateCA1Activation
-    Properties:
-      CertificateAuthorityArn: !Ref rSubordinateCA1Activation
-      CertificateSigningRequest: !GetAtt rSubordinateCA2.CertificateSigningRequest
-      SigningAlgorithm: !Ref pSigningAlgorithm
-      TemplateArn: !If
-        - CreateSub4
-        - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen2/V1"
-        - !If
-          - CreateSub3
-          - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen1/V1"
-          - !If
-            - CreateSub2
-            - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen0/V1"
-            - !Ref "AWS::NoValue"
-      Validity:
-        Type: DAYS
-        Value: !Ref pSub2CACertExpiry
-  rSubordinateCA2Activation:
-    Type: "AWS::ACMPCA::CertificateAuthorityActivation"
-    Condition: CreateSub2
-    Properties:
-      CertificateAuthorityArn: !Ref rSubordinateCA2
-      Certificate: !GetAtt rSubordinateCA2Cert.Certificate
-      CertificateChain: !GetAtt rSubordinateCA1Activation.CompleteCertificateChain
-      Status: ACTIVE
-  rSubordinateCA3:
-    Type: AWS::ACMPCA::CertificateAuthority
-    Condition: CreateSub3
-    DependsOn: rSubordinateCA2
-    Properties:
-      Type: SUBORDINATE
-      Subject:
-        CommonName: !Ref pSub3CommonName
-        Organization: !Ref pOrganization
-        OrganizationalUnit: !Ref pOrganizationalUnit
-        Country: !Ref pCountry
-        State: !Ref pState
-        Locality: !Ref pLocality
-      KeyAlgorithm: !Ref pKeyAlgorithm
-      SigningAlgorithm: !Ref pSigningAlgorithm
-      RevocationConfiguration:
-        CrlConfiguration: !If
-          - EnableCRL
-          - Enabled: true
-            ExpirationInDays: !Ref pSub3CRLExpiry
-            S3BucketName: !Ref rRootCRLBucket
-            S3ObjectAcl: "BUCKET_OWNER_FULL_CONTROL"
-          - Enabled: false
-      Tags: 
-        - Key: "Purpose"
-          Value: "Subordinate CA3"
-  rSubordinateCA3Cert:
-    Type: "AWS::ACMPCA::Certificate"
-    Metadata:
-      cfn-lint:
-        config:
-          ignore_checks:
-            - W3005
-    Condition: CreateSub3
-    DependsOn: rSubordinateCA2Activation
-    Properties:
-      CertificateAuthorityArn: !Ref rSubordinateCA2Activation
-      CertificateSigningRequest: !GetAtt rSubordinateCA3.CertificateSigningRequest
-      SigningAlgorithm: !Ref pSigningAlgorithm
-      TemplateArn: !If
-        - CreateSub4
-        - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen1/V1"
-        - !If
-          - CreateSub3
-          - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen0/V1"
-          - !Ref "AWS::NoValue"
-      Validity:
-        Type: DAYS
-        Value: !Ref pSub3CACertExpiry
-  rSubordinateCA3Activation:
-    Type: "AWS::ACMPCA::CertificateAuthorityActivation"
-    Condition: CreateSub3
-    Properties:
-      CertificateAuthorityArn: !Ref rSubordinateCA3
-      Certificate: !GetAtt rSubordinateCA3Cert.Certificate
-      CertificateChain: !GetAtt rSubordinateCA2Activation.CompleteCertificateChain
-      Status: ACTIVE
-  rSubordinateCA4:
-    Type: AWS::ACMPCA::CertificateAuthority
-    Condition: CreateSub4
-    DependsOn: rSubordinateCA3
-    Properties:
-      Type: SUBORDINATE
-      Subject:
-        CommonName: !Ref pSub4CommonName
-        Organization: !Ref pOrganization
-        OrganizationalUnit: !Ref pOrganizationalUnit
-        Country: !Ref pCountry
-        State: !Ref pState
-        Locality: !Ref pLocality
-      KeyAlgorithm: !Ref pKeyAlgorithm
-      SigningAlgorithm: !Ref pSigningAlgorithm
-      RevocationConfiguration:
-        CrlConfiguration: !If
-          - EnableCRL
-          - Enabled: true
-            ExpirationInDays: !Ref pSub4CRLExpiry
-            S3BucketName: !Ref rRootCRLBucket
-            S3ObjectAcl: "BUCKET_OWNER_FULL_CONTROL"
-          - Enabled: false
-      Tags: 
-        - Key: "Purpose"
-          Value: "Subordinate CA4"
-  rSubordinateCA4Cert:
-    Type: "AWS::ACMPCA::Certificate"
-    Metadata:
-      cfn-lint:
-        config:
-          ignore_checks:
-            - W3005
-    Condition: CreateSub4
-    DependsOn: rSubordinateCA3Activation
-    Properties:
-      CertificateAuthorityArn: !Ref rSubordinateCA3Activation
-      CertificateSigningRequest: !GetAtt rSubordinateCA4.CertificateSigningRequest
-      SigningAlgorithm: !Ref pSigningAlgorithm
-      TemplateArn: "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen0/V1"
-      Validity:
-        Type: DAYS
-        Value: !Ref pSub4CACertExpiry
-  rSubordinateCA4Activation:
-    Type: "AWS::ACMPCA::CertificateAuthorityActivation"
-    Condition: CreateSub4
-    Properties:
-      CertificateAuthorityArn: !Ref rSubordinateCA4
-      Certificate: !GetAtt rSubordinateCA4Cert.Certificate
-      CertificateChain: !GetAtt rSubordinateCA3Activation.CompleteCertificateChain
-      Status: ACTIVE
-  # Only turn this on if there are no subordinates, otherwise share out only lowest level subordinate
+              - CreateSub3
+              - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen2/V1"
+              - !If
+                - CreateSub2
+                - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen1/V1"
+                - !If
+                  - CreateSub1
+                  - "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen0/V1"
+                  - !Ref "AWS::NoValue"
+          Validity:
+            Type: DAYS
+            Value: !Ref
+              'Fn::Sub': 'pSub${Level}CACertExpiry'
+      'rSubordinateCA${Level}Activation':
+        Type: "AWS::ACMPCA::CertificateAuthorityActivation"
+        Condition: !Sub 'CreateSub${Level}'
+        Properties:
+          CertificateAuthorityArn: !Ref 
+            'Fn::Sub': 'rSubordinateCA${Level}'
+          Certificate: !GetAtt
+            - 'Fn::Sub': 'rSubordinateCA${Level}Cert'
+            - Certificate
+          CertificateChain: !GetAtt rRootCAActivation.CompleteCertificateChain
+          Status: ACTIVE
+  # Only turn this on if there are no subordinates, otherwise share only lowest level subordinate
   rRootShare:
     Type: AWS::RAM::ResourceShare
     Condition: CreateRootShare
@@ -724,91 +570,35 @@ Resources:
       Tags: 
         - Key: "Purpose"
           Value: "Private CA for certificate signing"
-  rSubordinateCA1Share:
-    Type: AWS::RAM::ResourceShare
-    Condition: CreateSub1Share
-    DependsOn: rSubordinateCA1Activation
-    Properties:
-      AllowExternalPrincipals: false
-      Name: !Sub
-        - "SubordinateCAResourceShare-${CommonName}"
-        - CommonName: !Ref pSub1CommonName
-      Principals: !If
-        - CreateOUShare
-        - - !Sub "arn:aws:organizations::${pManagmentAccount}:ou/${pAWSOrganizationId}/${pAWSOrganizationalUnit}"
-        - !If
-          - CreateOrgShare
-          - - !Sub "arn:aws:organizations::${pManagmentAccount}:organization/${pAWSOrganizationId}"
-          - !Ref "AWS::NoValue"
-      ResourceArns:
-        - !Ref rSubordinateCA1
-      Tags: 
-        - Key: "Purpose"
-          Value: "Private CA for certificate signing"
-  rSubordinateCA2Share:
-    Type: AWS::RAM::ResourceShare
-    Condition: CreateSub2Share
-    DependsOn: rSubordinateCA2Activation
-    Properties:
-      AllowExternalPrincipals: false
-      Name: !Sub
-        - "SubordinateCAResourceShare-${CommonName}"
-        - CommonName: !Ref pSub2CommonName
-      Principals: !If
-        - CreateOUShare
-        - - !Sub "arn:aws:organizations::${pManagmentAccount}:ou/${pAWSOrganizationId}/${pAWSOrganizationalUnit}"
-        - !If
-          - CreateOrgShare
-          - - !Sub "arn:aws:organizations::${pManagmentAccount}:organization/${pAWSOrganizationId}"
-          - !Ref "AWS::NoValue"
-      ResourceArns:
-        - !Ref rSubordinateCA2
-      Tags: 
-        - Key: "Purpose"
-          Value: "Private CA for certificate signing"
-  rSubordinateCA3Share:
-    Type: AWS::RAM::ResourceShare
-    Condition: CreateSub3Share
-    DependsOn: rSubordinateCA3Activation
-    Properties:
-      AllowExternalPrincipals: false
-      Name: !Sub
-        - "SubordinateCAResourceShare-${CommonName}"
-        - CommonName: !Ref pSub3CommonName
-      Principals: !If
-        - CreateOUShare
-        - - !Sub "arn:aws:organizations::${pManagmentAccount}:ou/${pAWSOrganizationId}/${pAWSOrganizationalUnit}"
-        - !If
-          - CreateOrgShare
-          - - !Sub "arn:aws:organizations::${pManagmentAccount}:organization/${pAWSOrganizationId}"
-          - !Ref "AWS::NoValue"
-      ResourceArns:
-        - !Ref rSubordinateCA3
-      Tags: 
-        - Key: "Purpose"
-          Value: "Private CA for certificate signing"
-  rSubordinateCA4Share:
-    Type: AWS::RAM::ResourceShare
-    Condition: CreateSub4Share
-    DependsOn: rSubordinateCA4Activation
-    Properties:
-      AllowExternalPrincipals: false
-      Name: !Sub
-        - "SubordinateCAResourceShare-${CommonName}"
-        - CommonName: !Ref pSub4CommonName
-      Principals: !If
-        - CreateOUShare
-        - - !Sub "arn:aws:organizations::${pManagmentAccount}:ou/${pAWSOrganizationId}/${pAWSOrganizationalUnit}"
-        - !If
-          - CreateOrgShare
-          - - !Sub "arn:aws:organizations::${pManagmentAccount}:organization/${pAWSOrganizationId}"
-          - !Ref "AWS::NoValue"
-      ResourceArns:
-        - !Ref rSubordinateCA4
-      Tags: 
-        - Key: "Purpose"
-          Value: "Private CA for certificate signing"
-# output of stacks are buckets and end-entity subordinate
+  # Iterate through creation of requested subordinate shares
+  'Fn::ForEach::SubordinateCAShare':
+    - Level
+    - ["1", "2", "3", "4"]
+    - 'rSubordinateCA${Level}Share':
+        Type: AWS::RAM::ResourceShare
+        Condition: !Sub 'CreateSub${Level}Share'
+        DependsOn: !Sub 'rSubordinateCA${Level}Activation'
+        Properties:
+          AllowExternalPrincipals: false
+          Name: !Sub
+            - "SubordinateCAResourceShare-${CommonName}"
+            - CommonName: !Ref
+                'Fn::Sub': 'pSub${Level}CommonName'
+          Principals: !If
+            - CreateOUShare
+            - - !Sub "arn:aws:organizations::${pManagmentAccount}:ou/${pAWSOrganizationId}/${pAWSOrganizationalUnit}"
+            - !If
+              - CreateOrgShare
+              - - !Sub "arn:aws:organizations::${pManagmentAccount}:organization/${pAWSOrganizationId}"
+              - !Ref "AWS::NoValue"
+          ResourceArns:
+            - !Ref 
+              'Fn::Sub': 'rSubordinateCA${Level}'
+          Tags: 
+            - Key: "Purpose"
+              Value: "Private CA for certificate signing"
+
+# Output of stacks are buckets and certificate authority ARNs
 Outputs:
   oCRLBucket:
     Condition: EnableCRL
@@ -827,24 +617,23 @@ Outputs:
     Value: !Ref rRootCA
     Export:
       Name: !Sub "${AWS::StackName}-RootCA"  
-  oCertAuthority:
-    Condition: CreateShare
-    Description: The ARN of the Certificate Authority for issuing certificate
-    Value: !If
-        - CreateSub4Share
-        - rSubordinateCA3Activation.CompleteCertificateChain
-        - !If
-          - CreateSub3Share
-          - !Ref rSubordinateCA3
-          - !If
-            - CreateSub2Share
-            - !Ref rSubordinateCA2
-            - !If
-              - CreateSub1Share
-              - !Ref rSubordinateCA1
-              - !If
-                - CreateRootShare
-                - !Ref rRootCA
-                - !Ref "AWS::NoValue"
-    Export:
-      Name: !Sub "${AWS::StackName}-CertAuthority"
+  'Fn::ForEach::oSubordinateCA':
+    - Level
+    - ["1", "2", "3", "4"]
+    - 'oSubordinateCA${Level}':
+        Description: !Sub 'The ARN of the subordinate Certificate Authorities for SubordinateCA${Level}'
+        Condition: !Sub 'CreateSub${Level}'
+        Value: !Ref
+          'Fn::Sub': 'rSubordinateCA${Level}'
+        Export:
+          Name: !Sub '${AWS::StackName}-SubordinateCA${Level}' 
+  'Fn::ForEach::oSubordinateCAShare':
+    - Level
+    - ["1", "2", "3", "4"]
+    - 'oSubordinateCA${Level}Share':
+        Description: !Sub 'The ARN of the Certificate Authority AWS RAM shares for SubordinateCA${Level}'
+        Condition: !Sub 'CreateSub${Level}Share'
+        Value: !Ref
+          'Fn::Sub': 'rSubordinateCA${Level}Share'
+        Export:
+          Name: !Sub '${AWS::StackName}-CAShare${Level}'
