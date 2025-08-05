@@ -1,0 +1,115 @@
+Parameters:
+  pPCAConsumerRoleName:
+    Description: Name of the Private CA Consumer role, leave blank to skip this role
+    Default: "PCARole"
+    Type: String
+  pPCAConsumerPermissionsBoundary:
+    Description: Permissions Boundary ARN for PCA Consumer, this policy must be pre-defined
+    Type: String
+  pPCAConsumerAccounts:
+    Description: Comma separated list of AWS Account numbers for the principal that assumes the Private CA Consumer role, leave blank to use org or the local PCA account
+    Type: CommaDelimitedList
+  pPCAExternalId:
+    Description: External ID to be used when assuming the roles, default is ExternalPCARole
+    Type: String
+    Default: "ExternalPCARole"
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "IAM Roles"
+        Parameters:
+          - pPCAConsumerRoleName
+          - pPCAConsumerPermissionsBoundary
+          - pPCAConsumerAccounts
+          - pPCAExternalId
+    # Define user friendly names for the parameters
+    ParameterLabels:
+      pPCAConsumerRoleName:
+        default: Private CA Consumer Role Name
+      pPCAConsumerPermissionsBoundary:
+        default: Private CA Consumer Permissions Boundary
+      pPCAConsumerAccounts:
+        default: Private CA Consumer Accounts
+      pPCAExternalId:
+        default: Private CA External ID
+
+Conditions:
+  CreatePCAConsumerRole: !Not
+    - !Equals 
+      - !Ref pPCAConsumerRoleName
+      - ""
+  CreatePCAConsumerRoleWithBoundary: !Not 
+    - !Equals 
+      - !Ref pPCAConsumerPermissionsBoundary
+      - ""
+  UseLocalPCAAccountForConsumer: !Equals
+    - !Join ["", !Ref pPCAConsumerAccounts]
+    - ""
+  UseExternalId: !Not
+    - !Equals
+      - !Ref pPCAExternalId
+      - ""
+
+Resources:
+  rPCAConsumerRole:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::IAM::Role"
+    Condition: CreatePCAConsumerRole
+    DeletionPolicy: "Delete"
+    Properties:
+      RoleName: !Ref pPCAConsumerRoleName
+      Description: "Private CA consumer role"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal: !If
+            - UseLocalPCAAccountForConsumer
+            - AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            - AWS: !Ref pPCAConsumerAccounts
+            Condition: !If
+            - UseExternalId
+            - StringEquals:
+                "sts:ExternalId": !Ref pPCAExternalId
+            - !Ref "AWS::NoValue"
+      ManagedPolicyArns: 
+      - arn:aws:iam::aws:policy/AWSPrivateCAUser
+      Policies:
+      - PolicyName: "ConsumeCertificates"
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Sid: "ConsumeCertificates"
+            Effect: "Allow"
+            Action:
+            - "acm:AddTagsToCertificate"
+            - "acm:DeleteCertificate"
+            - "acm:DescribeCertificate"
+            - "acm:ExportCertificate"
+            - "acm:GetAccountConfiguration"
+            - "acm:GetCertificate"
+            - "acm:ImportCertificate"
+            - "acm:ListCertificates"
+            - "acm:ListTags"
+            - "acm:RemoveTagsFromCertificate"
+            - "acm:RenewCertificate"
+            - "acm:RequestCertificate"
+            - "acm:RestoreCertificate"
+            - "acm:RevokeCertificate"
+            - "acm:UpdateCertificateOptions"
+            Resource: "*"
+      PermissionsBoundary: !If
+      - CreatePCAConsumerRoleWithBoundary
+      - !Ref pPCAConsumerPermissionsBoundary
+      - !Ref "AWS::NoValue"
+      Path: "/"
+      Tags: 
+        - Key: "Purpose"
+          Value: "Consumer role for Private CA"
+
+Outputs:
+  oPCAConsumerRole:
+    Condition: CreatePCAConsumerRole
+    Value: !GetAtt rPCAConsumerRole.Arn
