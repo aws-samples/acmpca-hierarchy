@@ -167,9 +167,13 @@ Parameters:
   pPCAConsumerAccounts:
     Description: Comma separated list of AWS Account numbers for the principal that assumes the Private CA Consumer role, leave blank to use org or the local PCA account
     Type: CommaDelimitedList
-  pPCAConsumerRoleOrgs:
-    Description: Comma separated list of AWS Organizations OU IDs for the principal that assumes the Private CA Consumer role, leave blank when using an account list or the local PCA account, org will be used if Consumer accounts and Org ID are both specified
-    Type: CommaDelimitedList
+  pPCAConsumerOrg:
+    Description: The consumer role AWS Organization, e.g., o-fortestorg. Overrides consumer accounts if both are specified. Leave blank to use the specified accounts or or the local PCA account
+    Type: String
+  pPCAExternalId:
+    Description: External ID to be used when assuming the roles, default is ExternalPCARole
+    Type: String
+    Default: "ExternalPCARole"
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -234,7 +238,8 @@ Metadata:
           - pPCAConsumerRoleName
           - pPCAConsumerPermissionsBoundary
           - pPCAConsumerAccounts
-          - pPCAConsumerRoleOrgs
+          - pPCAConsumerOrg
+          - pPCAExternalId
     # Define user friendly names for the parameters
     ParameterLabels:
       pOrganization:
@@ -303,8 +308,10 @@ Metadata:
         default: Private CA Consumer Permissions Boundary
       pPCAConsumerAccounts:
         default: Private CA Consumer Accounts
-      pPCAConsumerRoleOrgs:
+      pPCAConsumerOrg:
         default: Private CA Consumer Orgs 
+      pPCAExternalId:
+        default: Private CA External ID
 
 Conditions:
   # Do not create subordinates if their certificate subject common names are left blank
@@ -408,7 +415,11 @@ Conditions:
     - ""
   UseOrgForConsumer: !Not
     - !Equals
-      - !Join ["", !Ref pPCAConsumerRoleOrgs]
+      - !Ref pPCAConsumerOrg
+      - ""
+  UseExternalId: !Not
+    - !Equals
+      - !Ref pPCAExternalId
       - ""
 
 Resources:
@@ -688,6 +699,14 @@ Resources:
               - UseLocalPCAAccountForAdmin
               - !Ref AWS::AccountId
               - !Ref pPCAAdminAccounts
+            Condition: !If
+            - UseLocalPCAAccountForAdmin
+            - !Ref "AWS::NoValue"
+            - !If
+              - UseExternalId
+              - StringEquals:
+                  "sts:ExternalId": !Ref pPCAExternalId
+              - !Ref "AWS::NoValue"
       ManagedPolicyArns: 
       - arn:aws:iam::aws:policy/AWSPrivateCAFullAccess
       PermissionsBoundary: !If
@@ -720,9 +739,13 @@ Resources:
               - AWS: !Ref pPCAConsumerAccounts
             Condition: !If
             - UseOrgForConsumer
-            -   StringLike:
-                  "aws:PrincipalOrgID": !Ref pPCAConsumerRoleOrgs
-            - !Ref "AWS::NoValue"
+            - StringLike:
+                "aws:PrincipalOrgID": !Ref pPCAConsumerOrg
+            - !If 
+              - UseExternalId
+              - StringEquals:
+                    "sts:ExternalId": !Ref pPCAExternalId
+              - !Ref "AWS::NoValue"
       ManagedPolicyArns: 
       - arn:aws:iam::aws:policy/AWSPrivateCAUser
       Policies:
