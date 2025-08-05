@@ -157,19 +157,6 @@ Parameters:
   pPCAAdminAccounts:
     Description: Comma separated list of AWS Account number for the principal that assumes the Private CA Administration role, leave blank to use the local PCA account
     Type: CommaDelimitedList
-  pPCAConsumerRoleName:
-    Description: Name of the Private CA Consumer role, leave blank to skip this role
-    Default: "PCARole"
-    Type: String
-  pPCAConsumerPermissionsBoundary:
-    Description: Permissions Boundary ARN for PCA Consumer, this policy must be pre-defined
-    Type: String
-  pPCAConsumerAccounts:
-    Description: Comma separated list of AWS Account numbers for the principal that assumes the Private CA Consumer role, leave blank to use org or the local PCA account
-    Type: CommaDelimitedList
-  pPCAConsumerOrg:
-    Description: The consumer role AWS Organization, e.g., o-fortestorg. Overrides consumer accounts if both are specified. Leave blank to use the specified accounts or or the local PCA account
-    Type: String
   pPCAExternalId:
     Description: External ID to be used when assuming the roles, default is ExternalPCARole
     Type: String
@@ -235,10 +222,6 @@ Metadata:
           - pPCAAdminRoleName
           - pPCAAdminPermissionsBoundary
           - pPCAAdminAccounts
-          - pPCAConsumerRoleName
-          - pPCAConsumerPermissionsBoundary
-          - pPCAConsumerAccounts
-          - pPCAConsumerOrg
           - pPCAExternalId
     # Define user friendly names for the parameters
     ParameterLabels:
@@ -302,14 +285,6 @@ Metadata:
         default: Private CA Admin Permissions Boundary
       pPCAAdminAccounts:
         default: Private CA Admin Account
-      pPCAConsumerRoleName:
-        default: Private CA Consumer Role Name
-      pPCAConsumerPermissionsBoundary:
-        default: Private CA Consumer Permissions Boundary
-      pPCAConsumerAccounts:
-        default: Private CA Consumer Accounts
-      pPCAConsumerOrg:
-        default: Private CA Consumer Orgs 
       pPCAExternalId:
         default: Private CA External ID
 
@@ -402,21 +377,6 @@ Conditions:
   UseLocalPCAAccountForAdmin: !Equals
     - !Join ["", !Ref pPCAAdminAccounts]
     - ""
-  CreatePCAConsumerRole: !Not
-    - !Equals 
-      - !Ref pPCAConsumerRoleName
-      - ""
-  CreatePCAConsumerRoleWithBoundary: !Not 
-    - !Equals 
-      - !Ref pPCAConsumerPermissionsBoundary
-      - ""
-  UseLocalPCAAccountForConsumer: !Equals
-    - !Join ["", !Ref pPCAConsumerAccounts]
-    - ""
-  UseOrgForConsumer: !Not
-    - !Equals
-      - !Ref pPCAConsumerOrg
-      - ""
   UseExternalId: !Not
     - !Equals
       - !Ref pPCAExternalId
@@ -717,69 +677,6 @@ Resources:
       Tags: 
         - Key: "Purpose"
           Value: "Admin role for Private CA"
-  rPCAConsumerRole:
-    UpdateReplacePolicy: "Delete"
-    Type: "AWS::IAM::Role"
-    Condition: CreatePCAConsumerRole
-    DeletionPolicy: "Delete"
-    Properties:
-      RoleName: !Ref pPCAConsumerRoleName
-      Description: "Private CA consumer role"
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Action: sts:AssumeRole
-            # Trust policy when UseOrgForConsumer is true restricts Principal: AWS: * with Condition statement
-            Principal: !If
-            - UseOrgForConsumer
-            - AWS: "*"
-            - !If
-              - UseLocalPCAAccountForConsumer
-              - AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
-              - AWS: !Ref pPCAConsumerAccounts
-            Condition: !If
-            - UseOrgForConsumer
-            - StringLike:
-                "aws:PrincipalOrgID": !Ref pPCAConsumerOrg
-            - !If 
-              - UseExternalId
-              - StringEquals:
-                    "sts:ExternalId": !Ref pPCAExternalId
-              - !Ref "AWS::NoValue"
-      ManagedPolicyArns: 
-      - arn:aws:iam::aws:policy/AWSPrivateCAUser
-      Policies:
-      - PolicyName: "ConsumeCertificates"
-        PolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-          - Sid: "ConsumeCertificates"
-            Effect: "Allow"
-            Action:
-            - "acm:AddTagsToCertificate"
-            - "acm:DeleteCertificate"
-            - "acm:DescribeCertificate"
-            - "acm:ExportCertificate"
-            - "acm:GetAccountConfiguration"
-            - "acm:GetCertificate"
-            - "acm:ImportCertificate"
-            - "acm:ListCertificates"
-            - "acm:ListTags"
-            - "acm:RemoveTagsFromCertificate"
-            - "acm:RenewCertificate"
-            - "acm:RequestCertificate"
-            - "acm:RestoreCertificate"
-            - "acm:RevokeCertificate"
-            - "acm:UpdateCertificateOptions"
-            Resource: "*"
-      PermissionsBoundary: !If
-      - CreatePCAConsumerRoleWithBoundary
-      - !Ref pPCAConsumerPermissionsBoundary
-      - !Ref "AWS::NoValue"
-      Path: "/"
-      Tags: 
-        - Key: "Purpose"
-          Value: "Consumer role for Private CA"
 
 # Output of stacks are buckets and certificate authority ARNs
 Outputs:
@@ -823,6 +720,3 @@ Outputs:
   oPCAAdminRole:
     Condition: CreatePCAAdminRole
     Value: !GetAtt rPCAAdminRole.Arn
-  oPCAConsumerRole:
-    Condition: CreatePCAConsumerRole
-    Value: !GetAtt rPCAConsumerRole.Arn

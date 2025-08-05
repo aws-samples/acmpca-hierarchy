@@ -20,8 +20,8 @@ This solution has following features and benefits:
 - Save money by removing the need for a private CA in every account by using AWS RAM.
 - Create an optional S3 bucket for Certificate Revocation List (CRL).
 - Create an optional S3 bucket for CRL access logs.
-- Create an optional cross-account role for Private CA administration
-- Creat an optional cross-account role for consumption of Private CA certificates, e.g. to request or renew a certificate
+- Create an optional IAM role for Private CA administration, either in the Private CA account or cross-account with an External ID to protect against [the confused deputy problem](https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html)
+- A separate CloudFormation template to create a role for a certificate consumer of Private CA certificates in workload accounts, e.g. to request or renew a certificate
 
 # Usage
 
@@ -30,6 +30,7 @@ This solution has following features and benefits:
 - See the Test Cases below for CLI usage.  
 
 # Limitations
+
 - AWS recommends using Amazon CloudFront to serve CRLs to clients, see [Enable S3 Block Public Access (BPA) with CloudFront](https://docs.aws.amazon.com/privateca/latest/userguide/crl-planning.html#s3-bpa). This AWS CloudFormation template does not have CloudFront creation capabilities at this time. One may add this capability to the template themselves or enable it manually after stack creation.
 - This AWS CloudFormation template does not have OCSP enablement capabilities at this time. One may add this capability to the template themselves or enable it manually after stack creation.
 - This AWS CloudFormation template does not enable permissions for ACM at this time, see [AWS::ACMPCA::Permission](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-acmpca-permission.html). This is only needed for the ACM principal to renew private PKI certificates requested through ACM and residing in the same AWS account as the CA.One may add this capability to the template themselves or enable it manually after stack creation.
@@ -95,31 +96,31 @@ Use the AWS CLI for easy testing. ***Make sure you are using the security accoun
 *Modify the parameter files with your management account, orgID, OU and bucket names*
 
 ```
-aws cloudformation create-stack --stack-name testStack-L0 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL0.json --capabilities CAPABILITY_AUTO_EXPAND,CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name testStack-L0 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL0.json --capabilities CAPABILITY_AUTO_EXPAND CAPABILITY_NAMED_IAM
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-L1 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL1.json --capabilities CAPABILITY_AUTO_EXPAND,CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name testStack-L1 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL1.json --capabilities CAPABILITY_AUTO_EXPAND CAPABILITY_NAMED_IAM
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-L2 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL2.json --capabilities CAPABILITY_AUTO_EXPAND,CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name testStack-L2 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL2.json --capabilities CAPABILITY_AUTO_EXPAND CAPABILITY_NAMED_IAM
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-L3 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL3.json --capabilities CAPABILITY_AUTO_EXPAND,CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name testStack-L3 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL3.json --capabilities CAPABILITY_AUTO_EXPAND CAPABILITY_NAMED_IAM
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-L4 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4.json --capabilities CAPABILITY_AUTO_EXPAND,CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name testStack-L4 --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4.json --capabilities CAPABILITY_AUTO_EXPAND CAPABILITY_NAMED_IAM
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-NoCRL --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStack-NoCRL.json --capabilities CAPABILITY_AUTO_EXPAND,CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name testStack-NoCRL --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStack-NoCRL.json --capabilities CAPABILITY_AUTO_EXPAND CAPABILITY_NAMED_IAM
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-NoLogBucket --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStack-NoLogBucket.json --capabilities CAPABILITY_AUTO_EXPAND,CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name testStack-NoLogBucket --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStack-NoLogBucket.json --capabilities CAPABILITY_AUTO_EXPAND CAPABILITY_NAMED_IAM
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-orgShare --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4-orgShare.json --capabilities CAPABILITY_AUTO_EXPAND,CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name testStack-orgShare --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4-orgShare.json --capabilities CAPABILITY_AUTO_EXPAND CAPABILITY_NAMED_IAM
 ```
 ```
-aws cloudformation create-stack --stack-name testStack-noShare --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4-noShare.json --capabilities CAPABILITY_AUTO_EXPAND,CAPABILITY_NAMED_IAM
+aws cloudformation create-stack --stack-name testStack-noShare --template-body file://AWSPCA-RootCASubCA.yaml --parameters file://testStackL4-noShare.json --capabilities CAPABILITY_AUTO_EXPAND CAPABILITY_NAMED_IAM
 ```
 
 ## Certificate Lifecycle Tests
