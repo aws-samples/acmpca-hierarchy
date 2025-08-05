@@ -146,6 +146,21 @@ Parameters:
     Description: Share the lowest level CA to the specified AWS Organizational Unit e.g. ou-foratestou. Leave this blank and include an Org ID above to share at the Organization level.
     Type: String
     Default: ""
+  # Optional roles
+  pPCAAdminRoleName:
+    Description: Name of the Private CA Administration role, leave blank to skip this role
+    Default: "PCAAdmin"
+    Type: String
+  pPCAAdminPermissionsBoundary:
+    Description: Permissions Boundary ARN for PCA Admin, this policy must be pre-defined
+    Type: String
+  pPCAAdminAccounts:
+    Description: Comma separated list of AWS Account number for the principal that assumes the Private CA Administration role, leave blank to use the local PCA account
+    Type: CommaDelimitedList
+  pPCAExternalId:
+    Description: External ID to be used when assuming the roles, default is ExternalPCARole
+    Type: String
+    Default: "ExternalPCARole"
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -201,6 +216,13 @@ Metadata:
           - pManagmentAccount
           - pAWSOrganizationId
           - pAWSOrganizationalUnit
+      - Label:
+          default: "IAM Roles"
+        Parameters:
+          - pPCAAdminRoleName
+          - pPCAAdminPermissionsBoundary
+          - pPCAAdminAccounts
+          - pPCAExternalId
     # Define user friendly names for the parameters
     ParameterLabels:
       pOrganization:
@@ -257,6 +279,14 @@ Metadata:
         default: AWS Organization Id
       pAWSOrganizationalUnit:
         default: AWS Organizational Unit
+      pPCAAdminRoleName:
+        default: Private CA Admin Role Name
+      pPCAAdminPermissionsBoundary:
+        default: Private CA Admin Permissions Boundary
+      pPCAAdminAccounts:
+        default: Private CA Admin Account
+      pPCAExternalId:
+        default: Private CA External ID
 
 Conditions:
   # Do not create subordinates if their certificate subject common names are left blank
@@ -336,6 +366,21 @@ Conditions:
   CreateSub4Share: !And
     - !Condition CreateShare
     - !Condition CreateSub4
+  CreatePCAAdminRole: !Not
+    - !Equals 
+      - !Ref pPCAAdminRoleName
+      - ""
+  CreatePCAAdminRoleWithBoundary: !Not 
+    - !Equals 
+      - !Ref pPCAAdminPermissionsBoundary
+      - ""
+  UseLocalPCAAccountForAdmin: !Equals
+    - !Join ["", !Ref pPCAAdminAccounts]
+    - ""
+  UseExternalId: !Not
+    - !Equals
+      - !Ref pPCAExternalId
+      - ""
 
 Resources:
   rLogCRLBucket:
@@ -597,6 +642,41 @@ Resources:
           Tags: 
             - Key: "Purpose"
               Value: "Private CA for certificate signing"
+  rPCAAdminRole:
+    UpdateReplacePolicy: "Delete"
+    Type: "AWS::IAM::Role"
+    Condition: CreatePCAAdminRole
+    DeletionPolicy: "Delete"
+    Properties:
+      RoleName: !Ref pPCAAdminRoleName
+      Description: "Private CA administration role"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal: 
+              AWS: !If
+              - UseLocalPCAAccountForAdmin
+              - !Ref AWS::AccountId
+              - !Ref pPCAAdminAccounts
+            Condition: !If
+            - UseLocalPCAAccountForAdmin
+            - !Ref "AWS::NoValue"
+            - !If
+              - UseExternalId
+              - StringEquals:
+                  "sts:ExternalId": !Ref pPCAExternalId
+              - !Ref "AWS::NoValue"
+      ManagedPolicyArns: 
+      - arn:aws:iam::aws:policy/AWSPrivateCAFullAccess
+      PermissionsBoundary: !If
+      - CreatePCAAdminRoleWithBoundary
+      - !Ref pPCAAdminPermissionsBoundary
+      - !Ref "AWS::NoValue"
+      Path: "/"
+      Tags: 
+        - Key: "Purpose"
+          Value: "Admin role for Private CA"
 
 # Output of stacks are buckets and certificate authority ARNs
 Outputs:
@@ -637,3 +717,6 @@ Outputs:
           'Fn::Sub': 'rSubordinateCA${Level}Share'
         Export:
           Name: !Sub '${AWS::StackName}-CAShare${Level}'
+  oPCAAdminRole:
+    Condition: CreatePCAAdminRole
+    Value: !GetAtt rPCAAdminRole.Arn

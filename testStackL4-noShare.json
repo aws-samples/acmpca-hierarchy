@@ -58,6 +58,22 @@
     {
         "ParameterKey": "pAWSOrganizationalUnit",
         "ParameterValue": ""
+    },
+    {
+        "ParameterKey": "pPCAAdminRoleName",
+        "ParameterValue": "PrivateCAAdmin"
+    },
+    {
+        "ParameterKey": "pPCAAdminPermissionsBoundary",
+        "ParameterValue": ""
+    },
+    {
+        "ParameterKey": "pPCAAdminAccounts",
+        "ParameterValue": "5555666677778888"
+    },
+    {
+        "ParameterKey": "pPCAExternalId",
+        "ParameterValue": "ExternalPCARole"
     }
 ]
 

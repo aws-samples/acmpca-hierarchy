@@ -1,0 +1,19 @@
+[
+    {
+        "ParameterKey": "pPCAConsumerRoleName",
+        "ParameterValue": "CertificateConsumer"
+    },
+    {
+        "ParameterKey": "pPCAConsumerPermissionsBoundary",
+        "ParameterValue": ""
+    },
+    {
+        "ParameterKey": "pPCAConsumerAccounts",
+        "ParameterValue": "57xxxxxxxx89,97xxxxxxxx72"
+    },
+    {
+        "ParameterKey": "pPCAExternalId",
+        "ParameterValue": "PCARole123"
+    }
+]
+
