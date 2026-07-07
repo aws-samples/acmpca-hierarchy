@@ -475,6 +475,16 @@ Resources:
             Principal:
               Service:
                 - "acm-pca.amazonaws.com"
+          - Sid: DenyInsecureTransport
+            Effect: "Deny"
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !Join ["", ["arn:aws:s3:::", !Ref pRootCRLBucket, "/*"]]
+              - !Join ["", ["arn:aws:s3:::", !Ref pRootCRLBucket]]
+            Condition:
+              Bool:
+                "aws:SecureTransport": "false"
   # Bucket Policy has to be created before using it in RootCA
   BucketPolicyWaitHandle: 
     Condition: EnableCRL
